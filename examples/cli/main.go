@@ -3,12 +3,13 @@ package main
 import (
 	"fmt"
 
+	"github.com/id-tarzanych/lets-go-chat/pkg/generators"
 	"github.com/id-tarzanych/lets-go-chat/pkg/hasher"
 )
 
 func main() {
 	fmt.Println("Generating random password...")
-	pwd := randomString(16)
+	pwd := generators.RandomString(16)
 	fmt.Println("Password:", pwd)
 
 	hash, _ := hasher.HashPassword(pwd)
@@ -17,7 +18,7 @@ func main() {
 	fmt.Println()
 
 	fmt.Println("Generating random password...")
-	pwd = randomString(16)
+	pwd = generators.RandomString(16)
 	hash, _ = hasher.HashPassword(pwd)
 
 	fmt.Println("Checking correct and incorrect hashes")

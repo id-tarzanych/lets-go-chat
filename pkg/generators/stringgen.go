@@ -1,4 +1,4 @@
-package main
+package generators
 
 import (
 	"math/rand"
@@ -18,6 +18,6 @@ func stringWithCharset(length int, charset string) string {
 	return string(b)
 }
 
-func randomString(length int) string {
+func RandomString(length int) string {
 	return stringWithCharset(length, CHARSET)
 }
