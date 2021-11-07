@@ -1,4 +1,5 @@
 # Let's Go Chat
+[![Go Reference](https://pkg.go.dev/badge/github.com/id-tarzanych/lets-go-chat.svg)](https://pkg.go.dev/github.com/id-tarzanych/lets-go-chat)
 
 ## Introduction
 This repository is used for learning purposes.  
