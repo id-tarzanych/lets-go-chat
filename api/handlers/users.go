@@ -1,20 +1,30 @@
-package server
+package handlers
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/id-tarzanych/lets-go-chat/pkg/generators"
-	"github.com/id-tarzanych/lets-go-chat/pkg/hasher"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/id-tarzanych/lets-go-chat/internal/chat/models"
-	"github.com/id-tarzanych/lets-go-chat/internal/chat/types"
+	"github.com/id-tarzanych/lets-go-chat/api/server"
+	"github.com/id-tarzanych/lets-go-chat/internal/types"
+	"github.com/id-tarzanych/lets-go-chat/models"
+	"github.com/id-tarzanych/lets-go-chat/pkg/generators"
+	"github.com/id-tarzanych/lets-go-chat/pkg/hasher"
 )
 
-func (s *Server) handleUserCreate() http.HandlerFunc {
+type UsersRepo interface {
+	Create(u *models.User) error
+	GetByUserName(username string) (models.User, error)
+}
+
+type Users struct {
+	repo UsersRepo
+}
+
+func (s Users) HandleUserCreate() http.HandlerFunc {
 	userDao := *s.userDao
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +56,7 @@ func (s *Server) handleUserCreate() http.HandlerFunc {
 			return
 		}
 
-		if _, err := userDao.GetByUserName(username); err == nil {
+		if _, err := s.repo.GetByUserName(username); err == nil {
 			http.Error(w, fmt.Sprintf("User with username %s already exists", username), http.StatusBadRequest)
 			return
 		}
@@ -73,7 +83,7 @@ func (s *Server) handleUserCreate() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handleUserLogin() http.HandlerFunc {
+func (s Users) HandleUserLogin() http.HandlerFunc {
 	userDao := *s.userDao
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -123,8 +133,8 @@ func (s *Server) handleUserLogin() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("X-Rate-Limit", strconv.Itoa(RateLimit))
-		w.Header().Set("X-Expires-After", time.Now().Add(TokenDuration).Format(time.RFC1123))
+		w.Header().Set("X-Rate-Limit", strconv.Itoa(server.RateLimit))
+		w.Header().Set("X-Expires-After", time.Now().Add(server.TokenDuration).Format(time.RFC1123))
 		w.Write(js)
 	}
 }

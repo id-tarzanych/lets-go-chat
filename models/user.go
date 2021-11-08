@@ -2,7 +2,7 @@ package models
 
 import (
 	"github.com/google/uuid"
-	"github.com/id-tarzanych/lets-go-chat/internal/chat/types"
+	"github.com/id-tarzanych/lets-go-chat/internal/types"
 	"github.com/id-tarzanych/lets-go-chat/pkg/hasher"
 )
 
@@ -12,22 +12,22 @@ type User struct {
 	passwordHash string
 }
 
-func NewUser() *User  {
+func NewUser() *User {
 	id, _ := uuid.NewUUID()
 	u := &User{id: types.Uuid(id.String())}
 
 	return u
 }
 
-func (u User) Id() types.Uuid  {
+func (u User) Id() types.Uuid {
 	return u.id
 }
 
-func (u User) UserName() string  {
+func (u User) UserName() string {
 	return u.userName
 }
 
-func (u User) PasswordHash() string  {
+func (u User) PasswordHash() string {
 	return u.passwordHash
 }
 

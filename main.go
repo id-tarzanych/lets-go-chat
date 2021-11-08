@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/id-tarzanych/lets-go-chat/internal/chat/dao/factory"
-	"github.com/id-tarzanych/lets-go-chat/internal/chat/server"
+	"github.com/id-tarzanych/lets-go-chat/api/server"
+	"github.com/id-tarzanych/lets-go-chat/db/user"
 )
 
 func main() {
@@ -16,7 +16,7 @@ func main() {
 }
 
 func run() error {
-	userDao := factory.MakeUserDao("inmemory")
+	userDao := inmemory.MakeUserDao("inmemory")
 	srv := server.New(&userDao)
 
 	srv.Handle()

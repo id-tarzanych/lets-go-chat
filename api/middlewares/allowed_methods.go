@@ -1,8 +1,10 @@
-package server
+package middlewares
 
-import "net/http"
+import (
+	"net/http"
+)
 
-func (s *Server) getOnly(h http.HandlerFunc) http.HandlerFunc {
+func GetOnly(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Only GET method is allowed.", http.StatusBadRequest)
@@ -13,7 +15,7 @@ func (s *Server) getOnly(h http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func (s *Server) postOnly(h http.HandlerFunc) http.HandlerFunc {
+func PostOnly(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Only POST method is allowed.", http.StatusBadRequest)

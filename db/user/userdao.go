@@ -1,12 +1,12 @@
-package interfaces
+package user
 
 import (
-	"github.com/id-tarzanych/lets-go-chat/internal/chat/models"
-	"github.com/id-tarzanych/lets-go-chat/internal/chat/types"
+	"github.com/id-tarzanych/lets-go-chat/internal/types"
+	"github.com/id-tarzanych/lets-go-chat/models"
 )
 
 type UserDao interface {
-	Create (u *models.User) error
+	Create(u *models.User) error
 	Update(u *models.User) error
 	Delete(id types.Uuid) error
 	GetById(id types.Uuid) (models.User, error)
