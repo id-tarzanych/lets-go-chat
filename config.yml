@@ -1,0 +1,12 @@
+database:
+  type: postgres
+  host: db-postgresql-fra1-33806-do-user-2190630-0.b.db.ondigitalocean.com
+  port: 25060
+  user: doadmin
+  password:
+  database: defaultdb
+  ssl: true
+  sslCert: ""
+
+server:
+  port: 8080

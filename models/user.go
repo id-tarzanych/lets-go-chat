@@ -31,6 +31,12 @@ func (u User) PasswordHash() string {
 	return u.passwordHash
 }
 
+func (u *User) SetId(id types.Uuid) *User {
+	u.id = id
+
+	return u
+}
+
 func (u *User) SetUserName(username string) *User {
 	u.userName = username
 
@@ -39,6 +45,12 @@ func (u *User) SetUserName(username string) *User {
 
 func (u *User) SetPassword(password string) *User {
 	hash, _ := hasher.HashPassword(password)
+	u.passwordHash = hash
+
+	return u
+}
+
+func (u *User) SetPasswordHash(hash string) *User {
 	u.passwordHash = hash
 
 	return u
