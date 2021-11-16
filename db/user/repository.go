@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"database/sql"
 	"github.com/id-tarzanych/lets-go-chat/internal/types"
 	"github.com/id-tarzanych/lets-go-chat/models"
@@ -8,12 +9,12 @@ import (
 )
 
 type UserRepository interface {
-	Create(u *models.User) error
-	Update(u *models.User) error
-	Delete(id types.Uuid) error
-	GetById(id types.Uuid) (models.User, error)
-	GetByUserName(username string) (models.User, error)
-	GetAll() ([]models.User, error)
+	Create(ctx context.Context, u *models.User) error
+	Update(ctx context.Context, u *models.User) error
+	Delete(ctx context.Context, id types.Uuid) error
+	GetById(ctx context.Context, id types.Uuid) (models.User, error)
+	GetByUserName(ctx context.Context, name string) (models.User, error)
+	GetAll(ctx context.Context) ([]models.User, error)
 }
 
 type DatabaseUserRepository struct {
@@ -26,43 +27,31 @@ func NewDatabaseUserRepository(dbPool *sql.DB) *DatabaseUserRepository {
 	return pool
 }
 
-func (d DatabaseUserRepository) Create(u *models.User) error {
-	tx, err := d.dbPool.Begin()
-	if err != nil {
-		return err
-	}
-
-	stmt, err := tx.Prepare(
+func (d DatabaseUserRepository) Create(ctx context.Context, u *models.User) error {
+	stmt, err := d.dbPool.Prepare(
 		`INSERT INTO users (uuid, username, password) VALUES ($1, $2, $3)`,
 	)
 	if err != nil {
-		tx.Rollback()
 		return err
 	}
 
 	result, err := stmt.Exec(string(u.Id()), u.UserName(), u.PasswordHash())
 	if err != nil {
-		tx.Rollback()
 		return err
 	}
 
 	log.Println(result)
 
-	return tx.Commit()
+	return nil
 }
 
-func (d DatabaseUserRepository) Update(u *models.User) error {
-	tx, err := d.dbPool.Begin()
-	if err != nil {
-		return err
-	}
-
-	stmt, _ := tx.Prepare(`UPDATE users
+func (d DatabaseUserRepository) Update(ctx context.Context, u *models.User) error {
+	stmt, _ := d.dbPool.Prepare(`UPDATE users
 		SET username = $1, password = $2
 		WHERE uuid = $3
 	`)
 
-	_, err = stmt.Exec(
+	_, err := stmt.Exec(
 		u.UserName(),
 		u.PasswordHash(),
 		string(u.Id()),
@@ -71,27 +60,20 @@ func (d DatabaseUserRepository) Update(u *models.User) error {
 		return err
 	}
 
-	return tx.Commit()
+	return nil
 }
 
-func (d DatabaseUserRepository) Delete(id types.Uuid) error {
-	tx, err := d.dbPool.Begin()
-	if err != nil {
+func (d DatabaseUserRepository) Delete(ctx context.Context, id types.Uuid) error {
+	stmt, _ := d.dbPool.Prepare(`DELETE FROM users WHERE uuid = $1`)
+
+	if _, err := stmt.Exec(id); err != nil {
 		return err
 	}
 
-	stmt, _ := tx.Prepare(`DELETE FROM users WHERE uuid = $1`)
-
-	_, err = stmt.Exec(id)
-
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit()
+	return nil
 }
 
-func (d DatabaseUserRepository) GetById(id types.Uuid) (models.User, error) {
+func (d DatabaseUserRepository) GetById(ctx context.Context, id types.Uuid) (models.User, error) {
 	u := models.User{}
 	var userId types.Uuid
 	var username, hash string
@@ -106,7 +88,7 @@ func (d DatabaseUserRepository) GetById(id types.Uuid) (models.User, error) {
 	return u, nil
 }
 
-func (d DatabaseUserRepository) GetByUserName(name string) (models.User, error) {
+func (d DatabaseUserRepository) GetByUserName(ctx context.Context, name string) (models.User, error) {
 	u := models.User{}
 	var userId types.Uuid
 	var username, hash string
@@ -121,7 +103,7 @@ func (d DatabaseUserRepository) GetByUserName(name string) (models.User, error) 
 	return u, nil
 }
 
-func (d DatabaseUserRepository) GetAll() ([]models.User, error) {
+func (d DatabaseUserRepository) GetAll(context.Context) ([]models.User, error) {
 	// This now uses the unexported global variable.
 	rows, err := d.dbPool.Query("SELECT * FROM users")
 	if err != nil {

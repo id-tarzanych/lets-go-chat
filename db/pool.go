@@ -14,6 +14,10 @@ type Pool struct {
 	DB *sql.DB
 }
 
+type DbType string
+
+const Postgres DbType = "postgres"
+
 func (p *Pool) InitDatabase() {
 	panic("Undefined database type")
 }

@@ -12,9 +12,11 @@ type User struct {
 	passwordHash string
 }
 
-func NewUser() *User {
+func NewUser(username, password string) *User {
 	id, _ := uuid.NewUUID()
-	u := &User{id: types.Uuid(id.String())}
+	u := &User{id: types.Uuid(id.String()), userName: username}
+
+	u.SetPassword(password)
 
 	return u
 }
