@@ -8,31 +8,26 @@ import (
 	"strings"
 	"time"
 
-	"github.com/id-tarzanych/lets-go-chat/api/server"
+	"github.com/id-tarzanych/lets-go-chat/db/user"
 	"github.com/id-tarzanych/lets-go-chat/internal/types"
 	"github.com/id-tarzanych/lets-go-chat/models"
 	"github.com/id-tarzanych/lets-go-chat/pkg/generators"
 	"github.com/id-tarzanych/lets-go-chat/pkg/hasher"
 )
 
-type UsersRepo interface {
-	Create(u *models.User) error
-	GetByUserName(username string) (models.User, error)
+type Users struct {
+	repo user.UserRepository
 }
 
-type Users struct {
-	repo UsersRepo
+const rateLimit = 100
+const tokenDuration = time.Hour
+
+func NewUsers(repo user.UserRepository) *Users {
+	return &Users{repo: repo}
 }
 
 func (s Users) HandleUserCreate() http.HandlerFunc {
-	userDao := *s.userDao
-
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Only POST method is allowed.", http.StatusBadRequest)
-			return
-		}
-
 		var reqBody struct {
 			UserName string `json:"userName"`
 			Password string `json:"password"`
@@ -56,13 +51,13 @@ func (s Users) HandleUserCreate() http.HandlerFunc {
 			return
 		}
 
-		if _, err := s.repo.GetByUserName(username); err == nil {
+		if _, err := s.repo.GetByUserName(nil, username); err == nil {
 			http.Error(w, fmt.Sprintf("User with username %s already exists", username), http.StatusBadRequest)
 			return
 		}
 
-		user := models.NewUser().SetUserName(username).SetPassword(password)
-		if err := userDao.Create(user); err != nil {
+		user := models.NewUser(username, password)
+		if err := s.repo.Create(nil, user); err != nil {
 			http.Error(w, fmt.Sprintf("Could not create user %s", username), http.StatusBadRequest)
 			return
 		}
@@ -84,14 +79,7 @@ func (s Users) HandleUserCreate() http.HandlerFunc {
 }
 
 func (s Users) HandleUserLogin() http.HandlerFunc {
-	userDao := *s.userDao
-
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Only POST method is allowed.", http.StatusBadRequest)
-			return
-		}
-
 		var reqBody struct {
 			UserName string `json:"userName"`
 			Password string `json:"password"`
@@ -111,7 +99,7 @@ func (s Users) HandleUserLogin() http.HandlerFunc {
 			return
 		}
 
-		user, err = userDao.GetByUserName(username)
+		user, err = s.repo.GetByUserName(nil, username)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("User %s does not exist", username), http.StatusBadRequest)
 			return
@@ -133,8 +121,8 @@ func (s Users) HandleUserLogin() http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("X-Rate-Limit", strconv.Itoa(server.RateLimit))
-		w.Header().Set("X-Expires-After", time.Now().Add(server.TokenDuration).Format(time.RFC1123))
+		w.Header().Set("X-Rate-Limit", strconv.Itoa(rateLimit))
+		w.Header().Set("X-Expires-After", time.Now().Add(tokenDuration).Format(time.RFC1123))
 		w.Write(js)
 	}
 }
