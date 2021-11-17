@@ -7,7 +7,7 @@ import (
 
 const CHARSET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-var seededRand *rand.Rand = rand.New(
+var seededRand = rand.New(
 	rand.NewSource(time.Now().UnixNano()))
 
 func stringWithCharset(length int, charset string) string {

@@ -65,7 +65,7 @@ func (s Users) HandleUserCreate() http.HandlerFunc {
 		respBody := struct {
 			Id       types.Uuid `json:"id"`
 			UserName string     `json:"userName"`
-		}{user.Id(), user.UserName()}
+		}{user.ID, user.UserName}
 
 		js, err := json.Marshal(respBody)
 		if err != nil {
@@ -105,7 +105,7 @@ func (s Users) HandleUserLogin() http.HandlerFunc {
 			return
 		}
 
-		if !hasher.CheckPasswordHash(password, user.PasswordHash()) {
+		if !hasher.CheckPasswordHash(password, user.PasswordHash) {
 			http.Error(w, "Invalid username/password", http.StatusBadRequest)
 			return
 		}
