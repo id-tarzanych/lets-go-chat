@@ -1,7 +1,10 @@
 package app
 
 import (
+	"github.com/id-tarzanych/lets-go-chat/db/token"
+	"github.com/sirupsen/logrus"
 	"log"
+	"os"
 
 	"gorm.io/gorm"
 
@@ -11,26 +14,41 @@ import (
 )
 
 type Application struct {
-	config   *configurations.Configuration
-	db       *gorm.DB
-	userRepo *user.DatabaseUserRepository
+	config *configurations.Configuration
+	db     *gorm.DB
+	logger *logrus.Logger
+
+	userRepo  *user.DatabaseUserRepository
+	tokenRepo *token.DatabaseTokenRepository
 }
 
 func New(cfg *configurations.Configuration) (*Application, error) {
 	dbPool, err := initDB(cfg)
+
+	logger := logrus.New()
+	logger.SetOutput(os.Stdout)
+
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 
-	repo, err := user.NewDatabaseUserRepository(dbPool)
+	userRepo, err := user.NewDatabaseUserRepository(dbPool)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
+	}
+
+	tokenRepo, err := token.NewDatabaseTokenRepository(dbPool)
+	if err != nil {
+		logger.Fatal(err)
 	}
 
 	app := Application{
-		config:   cfg,
-		db:       dbPool,
-		userRepo: repo,
+		config: cfg,
+		db:     dbPool,
+		logger: logger,
+
+		userRepo:  userRepo,
+		tokenRepo: tokenRepo,
 	}
 
 	return &app, nil
@@ -54,6 +72,14 @@ func (a *Application) DB() *gorm.DB {
 	return a.db
 }
 
+func (a *Application) Logger() *logrus.Logger  {
+	return a.logger
+}
+
 func (a *Application) UserRepo() *user.DatabaseUserRepository {
 	return a.userRepo
+}
+
+func (a *Application) TokenRepo() *token.DatabaseTokenRepository {
+	return a.tokenRepo
 }

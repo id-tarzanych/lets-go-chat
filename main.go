@@ -26,6 +26,6 @@ func main() {
 }
 
 func runServer(app *app.Application) {
-	srv := server.New(*app.Config(), app.UserRepo())
+	srv := server.New(*app.Config(), app.UserRepo(), app.TokenRepo(), app.Logger())
 	srv.Handle()
 }

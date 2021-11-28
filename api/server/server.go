@@ -2,25 +2,54 @@ package server
 
 import (
 	"fmt"
-	"github.com/id-tarzanych/lets-go-chat/configurations"
-	"log"
-	"net/http"
-
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.com/id-tarzanych/lets-go-chat/api/handlers"
 	"github.com/id-tarzanych/lets-go-chat/api/middlewares"
+	"github.com/id-tarzanych/lets-go-chat/api/wss"
+	"github.com/id-tarzanych/lets-go-chat/configurations"
+	"github.com/id-tarzanych/lets-go-chat/db/token"
 	"github.com/id-tarzanych/lets-go-chat/db/user"
+	"github.com/justinas/alice"
+	"github.com/sirupsen/logrus"
+	"log"
+	"net/http"
 )
 
 type Server struct {
 	port int
 
-	router *mux.Router
-	userRepo user.UserRepository
+	logMiddleware  *middlewares.LogMiddleware
+	authMiddleware *middlewares.AuthMiddleware
+	router         *mux.Router
+
+	chatData       *wss.ChatData
+
+	requestUpgrader websocket.Upgrader
+
+	userRepo  user.UserRepository
+	tokenRepo token.TokenRepository
 }
 
-func New(cfg configurations.Configuration, userRepo user.UserRepository) *Server {
-	s := &Server{port: cfg.Server.Port, userRepo: userRepo, router: mux.NewRouter()}
+func New(cfg configurations.Configuration, userRepo user.UserRepository, tokenRepo token.TokenRepository, logger *logrus.Logger) *Server {
+	s := &Server{
+		port: cfg.Server.Port,
+
+		logMiddleware:  middlewares.NewLogMiddleware(logger),
+		authMiddleware: middlewares.NewAuthMiddleware(tokenRepo),
+		router:         mux.NewRouter(),
+
+		chatData: wss.NewChatData(),
+
+		requestUpgrader: websocket.Upgrader{
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+		},
+
+		userRepo:  userRepo,
+		tokenRepo: tokenRepo,
+	}
+
 	s.routes()
 
 	return s
@@ -30,13 +59,15 @@ func (s *Server) Handle() {
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", s.port), s.router))
 }
 
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.router.ServeHTTP(w, r)
-}
-
 func (s *Server) routes() {
-	u := handlers.NewUsers(s.userRepo)
+	userHandlers := handlers.NewUsers(s.userRepo, s.tokenRepo)
+	chatHandlers := handlers.NewChat(s.requestUpgrader, s.chatData, s.userRepo, s.tokenRepo, )
 
-	s.router.HandleFunc("/user", middlewares.PostOnly(u.HandleUserCreate()))
-	s.router.HandleFunc("/user/login", middlewares.PostOnly(u.HandleUserLogin()))
+	commonMW := alice.New(s.logMiddleware.LogError, s.logMiddleware.LogRequest, s.logMiddleware.LogPanicRecovery)
+
+	s.router.Handle("/user", commonMW.Append(middlewares.PostOnly).ThenFunc(userHandlers.HandleUserCreate()))
+	s.router.Handle("/user/login", commonMW.Append(middlewares.PostOnly).ThenFunc(userHandlers.HandleUserLogin()))
+
+	s.router.Handle("/user/active", commonMW.Append(middlewares.GetOnly).ThenFunc(chatHandlers.HandleActiveUsers()))
+	s.router.Handle("/chat/ws.rtm.start", commonMW.Append(s.authMiddleware.ValidateToken).Then(chatHandlers.HandleChatSession()))
 }

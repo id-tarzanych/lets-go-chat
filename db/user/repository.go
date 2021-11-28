@@ -58,7 +58,7 @@ func (d DatabaseUserRepository) Delete(ctx context.Context, id types.Uuid) error
 func (d DatabaseUserRepository) GetById(ctx context.Context, id types.Uuid) (models.User, error) {
 	u := models.User{}
 
-	result := d.db.First(&u, id)
+	result := d.db.First(&u, "id = ?", id)
 	if result.Error != nil {
 		return models.User{}, result.Error
 	}
