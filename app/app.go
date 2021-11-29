@@ -3,7 +3,6 @@ package app
 import (
 	"github.com/id-tarzanych/lets-go-chat/db/token"
 	"github.com/sirupsen/logrus"
-	"log"
 	"os"
 
 	"gorm.io/gorm"
@@ -23,10 +22,10 @@ type Application struct {
 }
 
 func New(cfg *configurations.Configuration) (*Application, error) {
-	dbPool, err := initDB(cfg)
-
 	logger := logrus.New()
 	logger.SetOutput(os.Stdout)
+
+	dbPool, err := initDB(cfg, logger)
 
 	if err != nil {
 		logger.Fatal(err)
@@ -54,12 +53,15 @@ func New(cfg *configurations.Configuration) (*Application, error) {
 	return &app, nil
 }
 
-func initDB(cfg *configurations.Configuration) (*gorm.DB, error) {
+func initDB(cfg *configurations.Configuration, logger *logrus.Logger) (*gorm.DB, error) {
 	switch db.DbType(cfg.Database.Type) {
 	case db.Postgres:
+		logger.Println("Using PostgreSQL database...")
+
 		return db.NewPostgresSession(cfg.Database)
 	default:
-		log.Println("Unrecognized database type! Fallback to in-memory database!")
+		logger.Println("Unrecognized database type! Fallback to in-memory database!")
+
 		return db.NewInMemorySession()
 	}
 }

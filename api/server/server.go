@@ -12,18 +12,19 @@ import (
 	"github.com/id-tarzanych/lets-go-chat/db/user"
 	"github.com/justinas/alice"
 	"github.com/sirupsen/logrus"
-	"log"
 	"net/http"
 )
 
 type Server struct {
 	port int
 
+	logger *logrus.Logger
+
 	logMiddleware  *middlewares.LogMiddleware
 	authMiddleware *middlewares.AuthMiddleware
 	router         *mux.Router
 
-	chatData       *wss.ChatData
+	chatData *wss.ChatData
 
 	requestUpgrader websocket.Upgrader
 
@@ -34,6 +35,8 @@ type Server struct {
 func New(cfg configurations.Configuration, userRepo user.UserRepository, tokenRepo token.TokenRepository, logger *logrus.Logger) *Server {
 	s := &Server{
 		port: cfg.Server.Port,
+
+		logger: logger,
 
 		logMiddleware:  middlewares.NewLogMiddleware(logger),
 		authMiddleware: middlewares.NewAuthMiddleware(tokenRepo),
@@ -56,12 +59,12 @@ func New(cfg configurations.Configuration, userRepo user.UserRepository, tokenRe
 }
 
 func (s *Server) Handle() {
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", s.port), s.router))
+	s.logger.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", s.port), s.router))
 }
 
 func (s *Server) routes() {
-	userHandlers := handlers.NewUsers(s.userRepo, s.tokenRepo)
-	chatHandlers := handlers.NewChat(s.requestUpgrader, s.chatData, s.userRepo, s.tokenRepo, )
+	userHandlers := handlers.NewUsers(s.logger, s.userRepo, s.tokenRepo)
+	chatHandlers := handlers.NewChat(s.logger, s.requestUpgrader, s.chatData, s.userRepo, s.tokenRepo)
 
 	commonMW := alice.New(s.logMiddleware.LogError, s.logMiddleware.LogRequest, s.logMiddleware.LogPanicRecovery)
 

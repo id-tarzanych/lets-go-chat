@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/id-tarzanych/lets-go-chat/db/token"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	netUrl "net/url"
 	"strconv"
@@ -18,6 +19,8 @@ import (
 )
 
 type Users struct {
+	logger *logrus.Logger
+
 	userRepo user.UserRepository
 	tokenRepo token.TokenRepository
 }
@@ -25,8 +28,8 @@ type Users struct {
 const rateLimit = 100
 const tokenDuration = time.Hour
 
-func NewUsers(userRepo user.UserRepository, tokenRepo token.TokenRepository) *Users {
-	return &Users{userRepo: userRepo, tokenRepo: tokenRepo}
+func NewUsers(logger *logrus.Logger, userRepo user.UserRepository, tokenRepo token.TokenRepository) *Users {
+	return &Users{logger: logger, userRepo: userRepo, tokenRepo: tokenRepo}
 }
 
 func (s Users) HandleUserCreate() http.HandlerFunc {

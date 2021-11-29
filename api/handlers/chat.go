@@ -3,7 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"time"
 
@@ -15,6 +15,8 @@ import (
 )
 
 type Chat struct {
+	logger *logrus.Logger
+
 	upgrader websocket.Upgrader
 	data     *wss.ChatData
 
@@ -22,8 +24,10 @@ type Chat struct {
 	tokenRepo token.TokenRepository
 }
 
-func NewChat(upgrader websocket.Upgrader, data *wss.ChatData, userRepo user.UserRepository, tokenRepo token.TokenRepository) *Chat {
+func NewChat(logger *logrus.Logger, upgrader websocket.Upgrader, data *wss.ChatData, userRepo user.UserRepository, tokenRepo token.TokenRepository) *Chat {
 	return &Chat{
+		logger: logger,
+
 		upgrader: upgrader,
 		data:     data,
 
@@ -31,7 +35,6 @@ func NewChat(upgrader websocket.Upgrader, data *wss.ChatData, userRepo user.User
 		tokenRepo: tokenRepo,
 	}
 }
-
 
 func (c *Chat) HandleActiveUsers() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +86,7 @@ func (c *Chat) HandleChatSession() http.HandlerFunc {
 
 			_, p, err := ws.ReadMessage()
 			if err != nil {
-				log.Println("Client Disconnected: ", err, preListen.EntryToken)
+				c.logger.Println("Client Disconnected: ", err, preListen.EntryToken)
 
 				break
 			}
@@ -101,6 +104,7 @@ func (c *Chat) HandleChatSession() http.HandlerFunc {
 				}
 				break
 			} else {
+				// Pong original message.
 				preListen.ClientWebSocket.WriteJSON(newElement)
 			}
 		}
@@ -113,7 +117,7 @@ func (c *Chat) chuckClient(object *wss.ClientObject) {
 }
 
 func (c *Chat) HandleClientMessage(clientData wss.ClientRequest) (error, *wss.ClientObject) {
-	log.Println("Entry Token is : ", clientData.EntryToken)
+	c.logger.Println("Entry Token is : ", clientData.EntryToken)
 
 	clientObj, found := c.data.ClientTokenMap[clientData.EntryToken]
 	if found == true {
