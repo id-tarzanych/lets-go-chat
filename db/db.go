@@ -3,18 +3,17 @@ package db
 import (
 	"fmt"
 
+	"github.com/id-tarzanych/lets-go-chat/configurations"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-
-	"github.com/id-tarzanych/lets-go-chat/configurations"
 )
 
 type DbType string
 
 const (
 	Postgres DbType = "postgres"
-	SQLite DbType = "sqlite"
+	SQLite   DbType = "sqlite"
 )
 
 func NewPostgresSession(cfg configurations.Database) (*gorm.DB, error) {

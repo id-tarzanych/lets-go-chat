@@ -18,7 +18,7 @@ import (
 type Server struct {
 	port int
 
-	logger *logrus.Logger
+	logger logrus.FieldLogger
 
 	logMiddleware  *middlewares.LogMiddleware
 	authMiddleware *middlewares.AuthMiddleware
@@ -32,7 +32,7 @@ type Server struct {
 	tokenRepo token.TokenRepository
 }
 
-func New(cfg configurations.Configuration, userRepo user.UserRepository, tokenRepo token.TokenRepository, logger *logrus.Logger) *Server {
+func New(cfg configurations.Configuration, userRepo user.UserRepository, tokenRepo token.TokenRepository, logger logrus.FieldLogger) *Server {
 	s := &Server{
 		port: cfg.Server.Port,
 
@@ -59,7 +59,7 @@ func New(cfg configurations.Configuration, userRepo user.UserRepository, tokenRe
 }
 
 func (s *Server) Handle() {
-	s.logger.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", s.port), s.router))
+	s.logger.Error(http.ListenAndServe(fmt.Sprintf(":%d", s.port), s.router))
 }
 
 func (s *Server) routes() {

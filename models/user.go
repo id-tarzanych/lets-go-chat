@@ -25,20 +25,8 @@ func NewUser(username, password string) *User {
 	return u
 }
 
-func (u *User) SetUserName(username string) *User {
-	u.UserName = username
-
-	return u
-}
-
 func (u *User) SetPassword(password string) *User {
 	hash, _ := hasher.HashPassword(password)
-	u.PasswordHash = hash
-
-	return u
-}
-
-func (u *User) SetPasswordHash(hash string) *User {
 	u.PasswordHash = hash
 
 	return u

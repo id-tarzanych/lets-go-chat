@@ -15,7 +15,7 @@ import (
 type Application struct {
 	config *configurations.Configuration
 	db     *gorm.DB
-	logger *logrus.Logger
+	logger logrus.FieldLogger
 
 	userRepo  *user.DatabaseUserRepository
 	tokenRepo *token.DatabaseTokenRepository
@@ -53,7 +53,7 @@ func New(cfg *configurations.Configuration) (*Application, error) {
 	return &app, nil
 }
 
-func initDB(cfg *configurations.Configuration, logger *logrus.Logger) (*gorm.DB, error) {
+func initDB(cfg *configurations.Configuration, logger logrus.FieldLogger) (*gorm.DB, error) {
 	switch db.DbType(cfg.Database.Type) {
 	case db.Postgres:
 		logger.Println("Using PostgreSQL database...")
@@ -74,7 +74,7 @@ func (a *Application) DB() *gorm.DB {
 	return a.db
 }
 
-func (a *Application) Logger() *logrus.Logger  {
+func (a *Application) Logger() logrus.FieldLogger  {
 	return a.logger
 }
 

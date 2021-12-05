@@ -1,10 +1,8 @@
 package middlewares
 
 import (
-	"bufio"
 	"fmt"
 	"math"
-	"net"
 	"net/http"
 	"net/http/httputil"
 
@@ -12,10 +10,10 @@ import (
 )
 
 type LogMiddleware struct {
-	logger *logrus.Logger
+	logger logrus.FieldLogger
 }
 
-func NewLogMiddleware(logger *logrus.Logger) *LogMiddleware {
+func NewLogMiddleware(logger logrus.FieldLogger) *LogMiddleware {
 	return &LogMiddleware{logger}
 }
 
@@ -25,25 +23,14 @@ type LoggingResponseWriterInterface interface {
 }
 
 type LoggingResponseWriter struct {
-	ResponseWriter LoggingResponseWriterInterface
+	LoggingResponseWriterInterface
+
 	statusCode int
-}
-
-func (lrw *LoggingResponseWriter) Header() http.Header {
-	return lrw.ResponseWriter.Header()
-}
-
-func (lrw *LoggingResponseWriter) Write(bytes []byte) (int, error) {
-	return lrw.ResponseWriter.Write(bytes)
 }
 
 func (lrw *LoggingResponseWriter) WriteHeader(code int) {
 	lrw.statusCode = code
-	lrw.ResponseWriter.WriteHeader(code)
-}
-
-func (lrw *LoggingResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error)  {
-	return lrw.ResponseWriter.Hijack()
+	lrw.LoggingResponseWriterInterface.WriteHeader(code)
 }
 
 func NewLoggingResponseWriter(w http.ResponseWriter) *LoggingResponseWriter {
@@ -52,11 +39,9 @@ func NewLoggingResponseWriter(w http.ResponseWriter) *LoggingResponseWriter {
 	return &LoggingResponseWriter{lrw, http.StatusOK}
 }
 
-
 func (lrw *LoggingResponseWriter) Status() int {
 	return lrw.statusCode
 }
-
 
 func (l *LogMiddleware) LogRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +81,7 @@ func (l *LogMiddleware) LogError(next http.Handler) http.Handler {
 		errorCategory := math.Floor(float64(lrw.Status()) / 100)
 
 		if errorCategory == 4 || errorCategory == 5 {
-			logrus.Println(fmt.Sprintf("Non-successful response! Status code: %d", lrw.Status()))
+			l.logger.Println(fmt.Sprintf("Non-successful response! Status code: %d", lrw.Status()))
 		}
 	})
 }

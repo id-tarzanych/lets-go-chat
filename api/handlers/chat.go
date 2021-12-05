@@ -2,20 +2,18 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
-	"github.com/sirupsen/logrus"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/websocket"
-
 	"github.com/id-tarzanych/lets-go-chat/api/wss"
 	"github.com/id-tarzanych/lets-go-chat/db/token"
 	"github.com/id-tarzanych/lets-go-chat/db/user"
+	"github.com/sirupsen/logrus"
 )
 
 type Chat struct {
-	logger *logrus.Logger
+	logger logrus.FieldLogger
 
 	upgrader websocket.Upgrader
 	data     *wss.ChatData
@@ -24,7 +22,7 @@ type Chat struct {
 	tokenRepo token.TokenRepository
 }
 
-func NewChat(logger *logrus.Logger, upgrader websocket.Upgrader, data *wss.ChatData, userRepo user.UserRepository, tokenRepo token.TokenRepository) *Chat {
+func NewChat(logger logrus.FieldLogger, upgrader websocket.Upgrader, data *wss.ChatData, userRepo user.UserRepository, tokenRepo token.TokenRepository) *Chat {
 	return &Chat{
 		logger: logger,
 
@@ -40,20 +38,12 @@ func (c *Chat) HandleActiveUsers() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		respBody := struct {
 			Count int `json:"count"`
-		}{len(c.data.Clients)}
+		}{Count: len(c.data.Clients)}
 
-		js, err := json.Marshal(respBody)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		js, _ := json.Marshal(respBody)
 
 		w.Header().Set("Content-Type", "application/json")
-
-		if _, err = w.Write(js); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		w.Write(js)
 	}
 }
 
@@ -65,20 +55,22 @@ func (c *Chat) HandleChatSession() http.HandlerFunc {
 
 		ws, err := c.upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			panic(err)
+			c.logger.Error("Could not initiate WebSocket connection.")
+
 			return
 		}
 
 		var preListen *wss.ClientObject
 		defer func() {
-			var e error
-
-			if preListen != nil {
-				e = preListen.ClientWebSocket.Close()
-				delete(c.data.Clients, preListen)
+			if preListen == nil {
+				return
 			}
 
-			fmt.Println(e)
+			if err := preListen.ClientWebSocket.Close(); err != nil {
+				c.logger.Println(err)
+			}
+
+			delete(c.data.Clients, preListen)
 		}()
 
 		for {
@@ -92,21 +84,32 @@ func (c *Chat) HandleChatSession() http.HandlerFunc {
 			}
 
 			err = json.Unmarshal(p, &newElement)
+			if err != nil {
+				c.logger.Warningln("Invalid request. ", err, p)
+
+				break
+			}
+
 			newElement.EntryToken = r.URL.Query().Get("token")
 			newElement.WebSocket = ws
 
-			err2, retrievedClient := c.HandleClientMessage(newElement)
+			retrievedClient, errHandle := c.handleClientMessage(newElement)
 			preListen = retrievedClient
 
-			if err2 != nil {
+			if errHandle != nil {
 				if retrievedClient != nil {
 					c.chuckClient(retrievedClient)
+				} else {
+					c.logger.Error("Could not initiate WebSocket connection.")
+
+					return
 				}
+
 				break
-			} else {
-				// Pong original message.
-				preListen.ClientWebSocket.WriteJSON(newElement)
 			}
+
+			// Pong original message.
+			preListen.ClientWebSocket.WriteJSON(newElement)
 		}
 	}
 }
@@ -116,7 +119,7 @@ func (c *Chat) chuckClient(object *wss.ClientObject) {
 	delete(c.data.ClientTokenMap, object.EntryToken)
 }
 
-func (c *Chat) HandleClientMessage(clientData wss.ClientRequest) (error, *wss.ClientObject) {
+func (c *Chat) handleClientMessage(clientData wss.ClientRequest) (*wss.ClientObject, error) {
 	c.logger.Println("Entry Token is : ", clientData.EntryToken)
 
 	clientObj, found := c.data.ClientTokenMap[clientData.EntryToken]
@@ -127,16 +130,16 @@ func (c *Chat) HandleClientMessage(clientData wss.ClientRequest) (error, *wss.Cl
 		clientObj.ClientWebSocket = clientData.WebSocket
 		c.data.Clients[clientObj] = true
 
-		return nil, clientObj
+		return clientObj, nil
 	} else {
 		t, err := c.tokenRepo.Get(nil, clientData.EntryToken)
 		if err != nil {
-			return err, nil
+			return nil, err
 		}
 
 		u, err := c.userRepo.GetById(nil, t.UserId)
 		if err != nil {
-			return err, nil
+			return nil, err
 		}
 
 		clientObject := &wss.ClientObject{
@@ -150,7 +153,7 @@ func (c *Chat) HandleClientMessage(clientData wss.ClientRequest) (error, *wss.Cl
 		// Invalidate token.
 		err = c.tokenRepo.Delete(nil, t.Token)
 		if err != nil {
-			return err, nil
+			return nil, err
 		}
 
 		// Map entryToken to client object
@@ -159,6 +162,6 @@ func (c *Chat) HandleClientMessage(clientData wss.ClientRequest) (error, *wss.Cl
 		// Map clientObject to a boolean true for easy broadcast
 		c.data.Clients[clientObject] = true
 
-		return nil, clientObject
+		return clientObject, nil
 	}
 }

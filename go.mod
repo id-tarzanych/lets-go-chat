@@ -3,9 +3,14 @@ module github.com/id-tarzanych/lets-go-chat
 go 1.17
 
 require (
+	github.com/getlantern/httptest v0.0.0-20161025015934-4b40f4c7e590
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
+	github.com/gorilla/websocket v1.4.2
 	github.com/ilyakaznacheev/cleanenv v1.2.5
+	github.com/justinas/alice v1.2.0
+	github.com/sirupsen/logrus v1.8.1
+	github.com/stretchr/testify v1.7.0
 	gorm.io/driver/postgres v1.2.2
 	gorm.io/driver/sqlite v1.2.4
 	gorm.io/gorm v1.22.3
@@ -13,7 +18,8 @@ require (
 
 require (
 	github.com/BurntSushi/toml v0.4.1 // indirect
-	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/getlantern/mockconn v0.0.0-20200818071412-cb30d065a848 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.10.0 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
@@ -25,15 +31,16 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.2 // indirect
 	github.com/joho/godotenv v1.4.0 // indirect
-	github.com/justinas/alice v1.2.0 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/lib/pq v1.10.4 // indirect
 	github.com/mattn/go-sqlite3 v1.14.9 // indirect
-	github.com/sirupsen/logrus v1.8.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/stretchr/objx v0.2.0 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
 	golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
 	olympos.io/encoding/edn v0.0.0-20201019073823-d3554ca0b0a3 // indirect
 )
