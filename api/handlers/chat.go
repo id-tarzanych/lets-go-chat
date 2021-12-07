@@ -122,8 +122,7 @@ func (c *Chat) chuckClient(object *wss.ClientObject) {
 func (c *Chat) handleClientMessage(clientData wss.ClientRequest) (*wss.ClientObject, error) {
 	c.logger.Println("Entry Token is : ", clientData.EntryToken)
 
-	clientObj, found := c.data.ClientTokenMap[clientData.EntryToken]
-	if found == true {
+	if clientObj, found := c.data.ClientTokenMap[clientData.EntryToken]; found == true {
 		// Update mapped client's web socket.
 		delete(c.data.Clients, clientObj)
 
@@ -131,37 +130,37 @@ func (c *Chat) handleClientMessage(clientData wss.ClientRequest) (*wss.ClientObj
 		c.data.Clients[clientObj] = true
 
 		return clientObj, nil
-	} else {
-		t, err := c.tokenRepo.Get(nil, clientData.EntryToken)
-		if err != nil {
-			return nil, err
-		}
-
-		u, err := c.userRepo.GetById(nil, t.UserId)
-		if err != nil {
-			return nil, err
-		}
-
-		clientObject := &wss.ClientObject{
-			UserName:        u.UserName,
-			ClientWebSocket: clientData.WebSocket,
-			IPAddress:       clientData.WebSocket.RemoteAddr().String(),
-			EntryToken:      clientData.EntryToken,
-			JoinedAt:        time.Now(),
-		}
-
-		// Invalidate token.
-		err = c.tokenRepo.Delete(nil, t.Token)
-		if err != nil {
-			return nil, err
-		}
-
-		// Map entryToken to client object
-		c.data.ClientTokenMap[clientData.EntryToken] = clientObject
-
-		// Map clientObject to a boolean true for easy broadcast
-		c.data.Clients[clientObject] = true
-
-		return clientObject, nil
 	}
+
+	t, err := c.tokenRepo.Get(nil, clientData.EntryToken)
+	if err != nil {
+		return nil, err
+	}
+
+	u, err := c.userRepo.GetById(nil, t.UserId)
+	if err != nil {
+		return nil, err
+	}
+
+	clientObject := &wss.ClientObject{
+		UserName:        u.UserName,
+		ClientWebSocket: clientData.WebSocket,
+		IPAddress:       clientData.WebSocket.RemoteAddr().String(),
+		EntryToken:      clientData.EntryToken,
+		JoinedAt:        time.Now(),
+	}
+
+	// Invalidate token.
+	err = c.tokenRepo.Delete(nil, t.Token)
+	if err != nil {
+		return nil, err
+	}
+
+	// Map entryToken to client object
+	c.data.ClientTokenMap[clientData.EntryToken] = clientObject
+
+	// Map clientObject to a boolean true for easy broadcast
+	c.data.Clients[clientObject] = true
+
+	return clientObject, nil
 }
