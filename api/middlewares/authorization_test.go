@@ -8,10 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/id-tarzanych/lets-go-chat/internal/testserver"
 	"github.com/id-tarzanych/lets-go-chat/mocks"
 	"github.com/id-tarzanych/lets-go-chat/models"
-	"github.com/stretchr/testify/mock"
 )
 
 const (
@@ -29,10 +30,29 @@ func TestAuthMiddleware_ValidateToken(t *testing.T) {
 		wantCode    int
 		wantMessage string
 	}{
-		{"No Token", httptest.NewRequest(http.MethodGet, "/test", nil), http.StatusBadRequest, "Access token is required."},
-		{"Valid Token", httptest.NewRequest(http.MethodGet, "/test?token="+validToken, nil), http.StatusOK, ""},
-		{"Invalid Token", httptest.NewRequest(http.MethodGet, "/test?token="+invalidToken, nil), http.StatusBadRequest, "Access token is invalid."},
-		{"Expired Token", httptest.NewRequest(http.MethodGet, "/test?token="+expiredToken, nil), http.StatusBadRequest, "Access token expired."},
+		{
+			name:        "No Token",
+			req:         httptest.NewRequest(http.MethodGet, "/test", nil),
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Access token is required.",
+		},
+		{
+			name:     "Valid Token",
+			req:      httptest.NewRequest(http.MethodGet, "/test?token="+validToken, nil),
+			wantCode: http.StatusOK,
+		},
+		{
+			name:        "Invalid Token",
+			req:         httptest.NewRequest(http.MethodGet, "/test?token="+invalidToken, nil),
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Access token is invalid.",
+		},
+		{
+			name:        "Expired Token",
+			req:         httptest.NewRequest(http.MethodGet, "/test?token="+expiredToken, nil),
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Access token expired.",
+		},
 	}
 
 	tokenRepoMock := &mocks.TokenRepository{}

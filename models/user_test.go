@@ -16,7 +16,17 @@ func TestNewUser(t *testing.T) {
 		args pair
 		want pair
 	}{
-		{"User 1", pair{"user1", "12345678"}, pair{"user1", "ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f"}},
+		{
+			name: "User 1",
+			args: pair{
+				username: "user1",
+				password: "12345678",
+			},
+			want: pair{
+				username: "user1",
+				password: "ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f",
+			},
+		},
 		{"User 2", pair{"user2", "87654321"}, pair{"user2", "e24df920078c3dd4e7e8d2442f00e5c9ab2a231bb3918d65cc50906e49ecaef4"}},
 	}
 	for _, tt := range tests {
@@ -38,9 +48,21 @@ func TestUser_SetPassword(t *testing.T) {
 		password string
 		wantHash string
 	}{
-		{"Password 1", "12345678", "ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f"},
-		{"Password 2", "Secr3tP@s$w0rd", "39a982ef00b8dff3632db20d56141060648ad3bf0dbc57d3e57386aa6b3b81d1"},
-		{"Password 3", "SomePass", "c21c4ec6e85ba12ccb2ccf117dd405a9f5915f2722d50dce4739400b164cfb9e"},
+		{
+			name:     "Password 1",
+			password: "12345678",
+			wantHash: "ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f",
+		},
+		{
+			name:     "Password 2",
+			password: "Secr3tP@s$w0rd",
+			wantHash: "39a982ef00b8dff3632db20d56141060648ad3bf0dbc57d3e57386aa6b3b81d1",
+		},
+		{
+			name:     "Password 3",
+			password: "SomePass",
+			wantHash: "c21c4ec6e85ba12ccb2ccf117dd405a9f5915f2722d50dce4739400b164cfb9e",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

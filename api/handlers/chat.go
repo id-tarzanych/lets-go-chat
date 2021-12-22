@@ -6,10 +6,11 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/sirupsen/logrus"
+
 	"github.com/id-tarzanych/lets-go-chat/api/wss"
 	"github.com/id-tarzanych/lets-go-chat/db/token"
 	"github.com/id-tarzanych/lets-go-chat/db/user"
-	"github.com/sirupsen/logrus"
 )
 
 type Chat struct {
@@ -151,8 +152,7 @@ func (c *Chat) handleClientMessage(clientData wss.ClientRequest) (*wss.ClientObj
 	}
 
 	// Invalidate token.
-	err = c.tokenRepo.Delete(nil, t.Token)
-	if err != nil {
+	if err = c.tokenRepo.Delete(nil, t.Token); err != nil {
 		return nil, err
 	}
 

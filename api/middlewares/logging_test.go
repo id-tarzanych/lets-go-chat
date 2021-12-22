@@ -8,9 +8,10 @@ import (
 	"testing"
 
 	hijacktest "github.com/getlantern/httptest"
+	"github.com/stretchr/testify/mock"
+
 	"github.com/id-tarzanych/lets-go-chat/internal/testserver"
 	"github.com/id-tarzanych/lets-go-chat/mocks"
-	"github.com/stretchr/testify/mock"
 )
 
 func TestLogMiddleware_LogError(t *testing.T) {
@@ -22,9 +23,23 @@ func TestLogMiddleware_LogError(t *testing.T) {
 		called     bool
 		statusCode int
 	}{
-		{"Bad Request", httptest.NewRequest(http.MethodGet, "/badRequest", nil), true, http.StatusBadRequest},
-		{"Internal Server Error", httptest.NewRequest(http.MethodGet, "/internalServerError", nil), true, http.StatusInternalServerError},
-		{"Valid Request", httptest.NewRequest(http.MethodGet, "/test", nil), false, http.StatusOK},
+		{
+			name:       "Bad Request",
+			req:        httptest.NewRequest(http.MethodGet, "/badRequest", nil),
+			called:     true,
+			statusCode: http.StatusBadRequest,
+		},
+		{
+			name:       "Internal Server Error",
+			req:        httptest.NewRequest(http.MethodGet, "/internalServerError", nil),
+			called:     true,
+			statusCode: http.StatusInternalServerError,
+		},
+		{
+			name:       "Valid Request",
+			req:        httptest.NewRequest(http.MethodGet, "/test", nil),
+			statusCode: http.StatusOK,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -56,10 +71,23 @@ func TestLogMiddleware_LogPanicRecovery(t *testing.T) {
 		req      *http.Request
 		panicked bool
 	}{
-		{"Panic", httptest.NewRequest(http.MethodGet, "/panic", nil), true},
-		{"Bad Request", httptest.NewRequest(http.MethodGet, "/badRequest", nil), false},
-		{"Internal Server Error", httptest.NewRequest(http.MethodGet, "/internalServerError", nil), false},
-		{"Valid Request", httptest.NewRequest(http.MethodGet, "/test", nil), false},
+		{
+			name:     "Panic",
+			req:      httptest.NewRequest(http.MethodGet, "/panic", nil),
+			panicked: true,
+		},
+		{
+			name: "Bad Request",
+			req:  httptest.NewRequest(http.MethodGet, "/badRequest", nil),
+		},
+		{
+			name: "Internal Server Error",
+			req:  httptest.NewRequest(http.MethodGet, "/internalServerError", nil),
+		},
+		{
+			name: "Valid Request",
+			req:  httptest.NewRequest(http.MethodGet, "/test", nil),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -90,9 +118,18 @@ func TestLogMiddleware_LogRequest(t *testing.T) {
 		name string
 		req  *http.Request
 	}{
-		{"Bad Request", httptest.NewRequest(http.MethodGet, "/badRequest", nil)},
-		{"Internal Server Error", httptest.NewRequest(http.MethodGet, "/internalServerError", nil)},
-		{"Valid Request", httptest.NewRequest(http.MethodGet, "/test", nil)},
+		{
+			name: "Bad Request",
+			req:  httptest.NewRequest(http.MethodGet, "/badRequest", nil),
+		},
+		{
+			name: "Internal Server Error",
+			req:  httptest.NewRequest(http.MethodGet, "/internalServerError", nil),
+		},
+		{
+			name: "Valid Request",
+			req:  httptest.NewRequest(http.MethodGet, "/test", nil),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

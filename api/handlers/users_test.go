@@ -7,13 +7,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/id-tarzanych/lets-go-chat/mocks"
 	"github.com/id-tarzanych/lets-go-chat/models"
-	"github.com/stretchr/testify/mock"
 )
 
 func TestUsers_HandleUserCreate(t *testing.T) {
-	loggerMock, userRepoMock, tokenRepoMock := getUserHandlerMocks()
+	loggerMock, userRepoMock, tokenRepoMock := getUserHandlerMocks(t)
 
 	handlers := Users{
 		logger:    loggerMock,
@@ -27,17 +28,71 @@ func TestUsers_HandleUserCreate(t *testing.T) {
 		wantCode    int
 		wantMessage string
 	}{
-		{"Invalid syntax", "{123]", http.StatusBadRequest, "Syntax error"},
-		{"Empty username", "{\"password\": \"12345678\"}", http.StatusBadRequest, "Empty username or password"},
-		{"Empty username", "{\"userName\": \"\", \"password\": \"12345678\"}", http.StatusBadRequest, "Empty username or password"},
-		{"Empty password", "{\"userName\": \"testuser\"}", http.StatusBadRequest, "Empty username or password"},
-		{"Empty password", "{\"userName\": \"username\", \"password\": \"\"}", http.StatusBadRequest, "Empty username or password"},
-		{"Empty username and password", "{\"userName\": \"\", \"password\": \"\"}", http.StatusBadRequest, "Empty username or password"},
-		{"Empty username and password", "{}", http.StatusBadRequest, "Empty username or password"},
-		{"Short password", "{\"userName\": \"username\", \"password\": \"123\"}", http.StatusBadRequest, "Password should be at least 8 characters"},
-		{"Username conflict", "{\"userName\": \"existingUser\", \"password\": \"12345678\"}", http.StatusBadRequest, "User with username existingUser already exists"},
-		{"Storage operation error", "{\"userName\": \"storageErrorUser\", \"password\": \"12345678\"}", http.StatusBadRequest, "Could not create user storageErrorUser"},
-		{"Successful user creation", "{\"userName\": \"newUser\", \"password\": \"12345678\"}", http.StatusOK, ""},
+		{
+			name:        "Invalid syntax",
+			requestJSON: "{123]",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Syntax error",
+		},
+		{
+			name:        "Empty username",
+			requestJSON: "{\"password\": \"12345678\"}",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Empty username or password",
+		},
+		{
+			name:        "Empty username",
+			requestJSON: "{\"userName\": \"\", \"password\": \"12345678\"}",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Empty username or password",
+		},
+		{
+			name:        "Empty password",
+			requestJSON: "{\"userName\": \"testuser\"}",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Empty username or password",
+		},
+		{
+			name:        "Empty password",
+			requestJSON: "{\"userName\": \"username\", \"password\": \"\"}",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Empty username or password",
+		},
+		{
+			name:        "Empty username and password",
+			requestJSON: "{\"userName\": \"\", \"password\": \"\"}",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Empty username or password",
+		},
+		{
+			name:        "Empty username and password",
+			requestJSON: "{}",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Empty username or password",
+		},
+		{
+			name:        "Short password",
+			requestJSON: "{\"userName\": \"username\", \"password\": \"123\"}",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Password should be at least 8 characters",
+		},
+		{
+			name:        "Username conflict",
+			requestJSON: "{\"userName\": \"existingUser\", \"password\": \"12345678\"}",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "User with username existingUser already exists",
+		},
+		{
+			name:        "Storage operation error",
+			requestJSON: "{\"userName\": \"storageErrorUser\", \"password\": \"12345678\"}",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Could not create user storageErrorUser",
+		},
+		{
+			name:        "Successful user creation",
+			requestJSON: "{\"userName\": \"newUser\", \"password\": \"12345678\"}",
+			wantCode:    http.StatusOK,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -59,7 +114,7 @@ func TestUsers_HandleUserCreate(t *testing.T) {
 }
 
 func TestUsers_HandleUserLogin(t *testing.T) {
-	loggerMock, userRepoMock, tokenRepoMock := getUserHandlerMocks()
+	loggerMock, userRepoMock, tokenRepoMock := getUserHandlerMocks(t)
 
 	handlers := Users{
 		logger:    loggerMock,
@@ -73,17 +128,71 @@ func TestUsers_HandleUserLogin(t *testing.T) {
 		wantCode    int
 		wantMessage string
 	}{
-		{"Invalid syntax", "{123]", http.StatusBadRequest, "Syntax error"},
-		{"Empty username", "{\"password\": \"12345678\"}", http.StatusBadRequest, "Empty username or password"},
-		{"Empty username", "{\"userName\": \"\", \"password\": \"12345678\"}", http.StatusBadRequest, "Empty username or password"},
-		{"Empty password", "{\"userName\": \"testuser\"}", http.StatusBadRequest, "Empty username or password"},
-		{"Empty password", "{\"userName\": \"username\", \"password\": \"\"}", http.StatusBadRequest, "Empty username or password"},
-		{"Empty username and password", "{\"userName\": \"\", \"password\": \"\"}", http.StatusBadRequest, "Empty username or password"},
-		{"Empty username and password", "{}", http.StatusBadRequest, "Empty username or password"},
-		{"Non-existing user", "{\"userName\": \"newUser\", \"password\": \"12345678\"}", http.StatusBadRequest, "User newUser does not exist"},
-		{"Valid User", "{\"userName\": \"existingUser\", \"password\": \"12345678\"}", http.StatusOK, ""},
-		{"Incorrect password", "{\"userName\": \"existingUser\", \"password\": \"1234567890\"}", http.StatusBadRequest, "Invalid username/password"},
-		{"Token Storage Error", "{\"userName\": \"tokenStorageError\", \"password\": \"12345678\"}", http.StatusInternalServerError, "Could not generate one-time token"},
+		{
+			name:        "Invalid syntax",
+			requestJSON: "{123]",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Syntax error",
+		},
+		{
+			name:        "Empty username",
+			requestJSON: "{\"password\": \"12345678\"}",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Empty username or password",
+		},
+		{
+			name:        "Empty username",
+			requestJSON: "{\"userName\": \"\", \"password\": \"12345678\"}",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Empty username or password",
+		},
+		{
+			name:        "Empty password",
+			requestJSON: "{\"userName\": \"testuser\"}",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Empty username or password",
+		},
+		{
+			name:        "Empty password",
+			requestJSON: "{\"userName\": \"username\", \"password\": \"\"}",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Empty username or password",
+		},
+		{
+			name:        "Empty username and password",
+			requestJSON: "{\"userName\": \"\", \"password\": \"\"}",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Empty username or password",
+		},
+		{
+			name:        "Empty username and password",
+			requestJSON: "{}",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Empty username or password",
+		},
+		{
+			name:        "Non-existing user",
+			requestJSON: "{\"userName\": \"newUser\", \"password\": \"12345678\"}",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "User newUser does not exist",
+		},
+		{
+			name:        "Valid User",
+			requestJSON: "{\"userName\": \"existingUser\", \"password\": \"12345678\"}",
+			wantCode:    http.StatusOK,
+		},
+		{
+			name:        "Incorrect password",
+			requestJSON: "{\"userName\": \"existingUser\", \"password\": \"1234567890\"}",
+			wantCode:    http.StatusBadRequest,
+			wantMessage: "Invalid username/password",
+		},
+		{
+			name:        "Token Storage Error",
+			requestJSON: "{\"userName\": \"tokenStorageError\", \"password\": \"12345678\"}",
+			wantCode:    http.StatusInternalServerError,
+			wantMessage: "Could not generate one-time token",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -102,9 +211,13 @@ func TestUsers_HandleUserLogin(t *testing.T) {
 			}
 		})
 	}
+
+	loggerMock.AssertExpectations(t)
+	userRepoMock.AssertExpectations(t)
+	tokenRepoMock.AssertExpectations(t)
 }
 
-func getUserHandlerMocks() (*mocks.FieldLogger, *mocks.UserRepository, *mocks.TokenRepository) {
+func getUserHandlerMocks(t *testing.T) (*mocks.FieldLogger, *mocks.UserRepository, *mocks.TokenRepository) {
 	loggerMock := &mocks.FieldLogger{}
 	userRepoMock := &mocks.UserRepository{}
 	tokenRepoMock := &mocks.TokenRepository{}
@@ -113,49 +226,49 @@ func getUserHandlerMocks() (*mocks.FieldLogger, *mocks.UserRepository, *mocks.To
 		"GetByUserName",
 		mock.Anything,
 		"existingUser",
-	).Return(models.User{ID: "uuid", UserName: "existingUser", PasswordHash: "ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f"}, nil)
+	).Maybe().Return(models.User{ID: "uuid", UserName: "existingUser", PasswordHash: "ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f"}, nil)
 
 	userRepoMock.On(
 		"GetByUserName",
 		mock.Anything,
 		"tokenStorageError",
-	).Return(models.User{ID: "uuid-token-storage-error", UserName: "tokenStorageError", PasswordHash: "ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f"}, nil)
+	).Maybe().Return(models.User{ID: "uuid-token-storage-error", UserName: "tokenStorageError", PasswordHash: "ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f"}, nil)
 
 	userRepoMock.On(
 		"GetByUserName",
 		mock.Anything,
 		"storageErrorUser",
-	).Return(models.User{ID: "uuid"}, errors.New("storage error"))
+	).Maybe().Return(models.User{ID: "uuid"}, errors.New("storage error"))
 
 	userRepoMock.On(
 		"GetByUserName",
 		mock.Anything,
 		"newUser",
-	).Return(models.User{}, errors.New("could not find user"))
+	).Maybe().Return(models.User{}, errors.New("could not find user"))
 
 	userRepoMock.On(
 		"Create",
 		mock.Anything,
 		mock.MatchedBy(func(u *models.User) bool { return u.UserName == "storageErrorUser" }),
-	).Return(errors.New("storage error"))
+	).Maybe().Return(errors.New("storage error"))
 
 	userRepoMock.On(
 		"Create",
 		mock.Anything,
 		mock.MatchedBy(func(u *models.User) bool { return u.UserName != "storageErrorUser" }),
-	).Return(nil)
+	).Maybe().Return(nil)
 
 	tokenRepoMock.On(
 		"Create",
 		mock.Anything,
 		mock.MatchedBy(func(t *models.Token) bool { return t.UserId == "uuid-token-storage-error" }),
-	).Return(errors.New("storage error"))
+	).Maybe().Return(errors.New("storage error"))
 
 	tokenRepoMock.On(
 		"Create",
 		mock.Anything,
 		mock.Anything,
-	).Return(nil)
+	).Maybe().Return(nil)
 
 	return loggerMock, userRepoMock, tokenRepoMock
 }

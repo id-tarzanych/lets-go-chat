@@ -5,17 +5,19 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/mock"
+
 	"github.com/id-tarzanych/lets-go-chat/api/wss"
 	"github.com/id-tarzanych/lets-go-chat/mocks"
 	"github.com/id-tarzanych/lets-go-chat/models"
 	"github.com/id-tarzanych/lets-go-chat/pkg/generators"
-	"github.com/stretchr/testify/mock"
 )
 
 func TestChat_HandleActiveUsers(t *testing.T) {
@@ -26,9 +28,20 @@ func TestChat_HandleActiveUsers(t *testing.T) {
 		data            *wss.ChatData
 		wantActiveUsers int
 	}{
-		{"0 users", generateClientsData(0), 0},
-		{"5 users", generateClientsData(5), 5},
-		{"10 users", generateClientsData(10), 10},
+		{
+			name: "0 users",
+			data: generateClientsData(0),
+		},
+		{
+			name:            "5 users",
+			data:            generateClientsData(5),
+			wantActiveUsers: 5,
+		},
+		{
+			name:            "10 users",
+			data:            generateClientsData(10),
+			wantActiveUsers: 10,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -82,11 +95,12 @@ func TestChat_HandleChatSession_WebsocketInitiationError(t *testing.T) {
 
 func TestChat_HandleChatSession_ProcessValidMessage(t *testing.T) {
 	loggerMock, userRepoMock, tokenRepoMock := getChatHandlerMocks()
-	loggerMock.On("Error", mock.AnythingOfType("string")).Return()
-	loggerMock.On("Println", mock.Anything).Return()
+
+	loggerMock.On("Error", mock.AnythingOfType("string")).Maybe().Return()
+	loggerMock.On("Println", mock.Anything).Maybe().Return()
 	loggerMock.On("Println", mock.Anything, mock.Anything).Return()
-	loggerMock.On("Println", mock.Anything, mock.Anything, mock.Anything).Return()
-	loggerMock.On("Warningln", mock.AnythingOfType("string")).Return()
+	loggerMock.On("Println", mock.Anything, mock.Anything, mock.Anything).Maybe().Return()
+	loggerMock.On("Warningln", mock.AnythingOfType("string")).Maybe().Return()
 
 	user := *models.NewUser("testuser", "12345678")
 	tokenString := generators.RandomString(16)
@@ -142,10 +156,13 @@ func TestChat_HandleChatSession_ProcessValidMessage(t *testing.T) {
 		json.Unmarshal([]byte(message), requestMessage)
 		err = json.Unmarshal(p, responseMessage)
 
-		if !reflect.DeepEqual(requestMessage, responseMessage) {
-			t.Fatalf("bad message")
-		}
+		assert.NoError(t, err, "json should be valid")
+		assert.Equal(t, requestMessage, responseMessage, "objects should be equal")
 	}
+
+	loggerMock.AssertExpectations(t)
+	userRepoMock.AssertExpectations(t)
+	tokenRepoMock.AssertExpectations(t)
 }
 
 func getChatHandlerMocks() (*mocks.FieldLogger, *mocks.UserRepository, *mocks.TokenRepository) {

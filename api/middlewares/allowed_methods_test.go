@@ -17,12 +17,36 @@ func TestGetOnly(t *testing.T) {
 		req      *http.Request
 		wantCode int
 	}{
-		{"GET method", httptest.NewRequest(http.MethodGet, "/test", nil), http.StatusOK},
-		{"POST method", httptest.NewRequest(http.MethodPost, "/test", strings.NewReader("{}")), http.StatusBadRequest},
-		{"PUT method", httptest.NewRequest(http.MethodPut, "/test", strings.NewReader("{}")), http.StatusBadRequest},
-		{"DELETE method", httptest.NewRequest(http.MethodDelete, "/test", nil), http.StatusBadRequest},
-		{"OPTIONS method", httptest.NewRequest(http.MethodOptions, "/test", nil), http.StatusBadRequest},
-		{"HEAD method", httptest.NewRequest(http.MethodHead, "/test", nil), http.StatusBadRequest},
+		{
+			name:     "GET method",
+			req:      httptest.NewRequest(http.MethodGet, "/test", nil),
+			wantCode: http.StatusOK,
+		},
+		{
+			name:     "POST method",
+			req:      httptest.NewRequest(http.MethodPost, "/test", strings.NewReader("{}")),
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "PUT method",
+			req:      httptest.NewRequest(http.MethodPut, "/test", strings.NewReader("{}")),
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "DELETE method",
+			req:      httptest.NewRequest(http.MethodDelete, "/test", nil),
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "OPTIONS method",
+			req:      httptest.NewRequest(http.MethodOptions, "/test", nil),
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "HEAD method",
+			req:      httptest.NewRequest(http.MethodHead, "/test", nil),
+			wantCode: http.StatusBadRequest,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -45,12 +69,36 @@ func TestPostOnly(t *testing.T) {
 		req      *http.Request
 		wantCode int
 	}{
-		{"GET method", httptest.NewRequest(http.MethodGet, "/test", nil), http.StatusBadRequest},
-		{"POST method", httptest.NewRequest(http.MethodPost, "/test", strings.NewReader("{}")), http.StatusOK},
-		{"PUT method", httptest.NewRequest(http.MethodPut, "/test", strings.NewReader("{}")), http.StatusBadRequest},
-		{"DELETE method", httptest.NewRequest(http.MethodDelete, "/test", nil), http.StatusBadRequest},
-		{"OPTIONS method", httptest.NewRequest(http.MethodOptions, "/test", nil), http.StatusBadRequest},
-		{"HEAD method", httptest.NewRequest(http.MethodHead, "/test", nil), http.StatusBadRequest},
+		{
+			name:     "GET method",
+			req:      httptest.NewRequest(http.MethodGet, "/test", nil),
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "POST method",
+			req:      httptest.NewRequest(http.MethodPost, "/test", strings.NewReader("{}")),
+			wantCode: http.StatusOK,
+		},
+		{
+			name:     "PUT method",
+			req:      httptest.NewRequest(http.MethodPut, "/test", strings.NewReader("{}")),
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "DELETE method",
+			req:      httptest.NewRequest(http.MethodDelete, "/test", nil),
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "OPTIONS method",
+			req:      httptest.NewRequest(http.MethodOptions, "/test", nil),
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "HEAD method",
+			req:      httptest.NewRequest(http.MethodHead, "/test", nil),
+			wantCode: http.StatusBadRequest,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
