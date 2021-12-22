@@ -222,53 +222,15 @@ func getUserHandlerMocks(t *testing.T) (*mocks.FieldLogger, *mocks.UserRepositor
 	userRepoMock := &mocks.UserRepository{}
 	tokenRepoMock := &mocks.TokenRepository{}
 
-	userRepoMock.On(
-		"GetByUserName",
-		mock.Anything,
-		"existingUser",
-	).Maybe().Return(models.User{ID: "uuid", UserName: "existingUser", PasswordHash: "ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f"}, nil)
+	userRepoMock.On("GetByUserName", mock.Anything, "existingUser").Maybe().Return(models.User{ID: "uuid", UserName: "existingUser", PasswordHash: "ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f"}, nil)
+	userRepoMock.On("GetByUserName", mock.Anything, "tokenStorageError").Maybe().Return(models.User{ID: "uuid-token-storage-error", UserName: "tokenStorageError", PasswordHash: "ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f"}, nil)
+	userRepoMock.On("GetByUserName", mock.Anything, "storageErrorUser").Maybe().Return(models.User{ID: "uuid"}, errors.New("storage error"))
+	userRepoMock.On("GetByUserName", mock.Anything, "newUser").Maybe().Return(models.User{}, errors.New("could not find user"))
+	userRepoMock.On("Create", mock.Anything, mock.MatchedBy(func(u *models.User) bool { return u.UserName == "storageErrorUser" })).Maybe().Return(errors.New("storage error"))
+	userRepoMock.On("Create", mock.Anything, mock.MatchedBy(func(u *models.User) bool { return u.UserName != "storageErrorUser" })).Maybe().Return(nil)
 
-	userRepoMock.On(
-		"GetByUserName",
-		mock.Anything,
-		"tokenStorageError",
-	).Maybe().Return(models.User{ID: "uuid-token-storage-error", UserName: "tokenStorageError", PasswordHash: "ef797c8118f02dfb649607dd5d3f8c7623048c9c063d532cc95c5ed7a898a64f"}, nil)
-
-	userRepoMock.On(
-		"GetByUserName",
-		mock.Anything,
-		"storageErrorUser",
-	).Maybe().Return(models.User{ID: "uuid"}, errors.New("storage error"))
-
-	userRepoMock.On(
-		"GetByUserName",
-		mock.Anything,
-		"newUser",
-	).Maybe().Return(models.User{}, errors.New("could not find user"))
-
-	userRepoMock.On(
-		"Create",
-		mock.Anything,
-		mock.MatchedBy(func(u *models.User) bool { return u.UserName == "storageErrorUser" }),
-	).Maybe().Return(errors.New("storage error"))
-
-	userRepoMock.On(
-		"Create",
-		mock.Anything,
-		mock.MatchedBy(func(u *models.User) bool { return u.UserName != "storageErrorUser" }),
-	).Maybe().Return(nil)
-
-	tokenRepoMock.On(
-		"Create",
-		mock.Anything,
-		mock.MatchedBy(func(t *models.Token) bool { return t.UserId == "uuid-token-storage-error" }),
-	).Maybe().Return(errors.New("storage error"))
-
-	tokenRepoMock.On(
-		"Create",
-		mock.Anything,
-		mock.Anything,
-	).Maybe().Return(nil)
+	tokenRepoMock.On("Create", mock.Anything, mock.MatchedBy(func(t *models.Token) bool { return t.UserId == "uuid-token-storage-error" })).Maybe().Return(errors.New("storage error"))
+	tokenRepoMock.On("Create", mock.Anything, mock.Anything).Maybe().Return(nil)
 
 	return loggerMock, userRepoMock, tokenRepoMock
 }

@@ -105,12 +105,7 @@ func TestChat_HandleChatSession_ProcessValidMessage(t *testing.T) {
 	user := *models.NewUser("testuser", "12345678")
 	tokenString := generators.RandomString(16)
 
-	tokenRepoMock.On(
-		"Get",
-		mock.Anything,
-		tokenString,
-	).Return(models.Token{Token: tokenString, UserId: user.ID, Expiration: time.Now().Add(time.Hour * 24)}, nil)
-
+	tokenRepoMock.On("Get", mock.Anything, tokenString).Return(models.Token{Token: tokenString, UserId: user.ID, Expiration: time.Now().Add(time.Hour * 24)}, nil)
 	tokenRepoMock.On("Delete", mock.Anything, mock.Anything).Return(nil)
 
 	userRepoMock.On("GetById", mock.Anything, user.ID).Return(user, nil)
