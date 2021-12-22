@@ -1,81 +1,87 @@
 package app
 
 import (
-	"database/sql"
-	"fmt"
+	"github.com/id-tarzanych/lets-go-chat/db/token"
+	"github.com/sirupsen/logrus"
+	"os"
+
+	"gorm.io/gorm"
+
+	"github.com/id-tarzanych/lets-go-chat/configurations"
 	"github.com/id-tarzanych/lets-go-chat/db"
 	"github.com/id-tarzanych/lets-go-chat/db/user"
-	"log"
-	"strings"
-
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/id-tarzanych/lets-go-chat/configurations"
-	_ "github.com/lib/pq"
 )
 
 type Application struct {
-	config   *configurations.Configuration
-	dbPool   *db.AppDBPool
-	userRepo *user.DatabaseUserRepository
+	config *configurations.Configuration
+	db     *gorm.DB
+	logger logrus.FieldLogger
+
+	userRepo  *user.DatabaseUserRepository
+	tokenRepo *token.DatabaseTokenRepository
 }
 
 func New(cfg *configurations.Configuration) (*Application, error) {
-	appDBPool := initDBPool(cfg)
+	logger := logrus.New()
+	logger.SetOutput(os.Stdout)
 
-	app := Application{
-		config:   cfg,
-		dbPool:   &appDBPool,
-		userRepo: user.NewDatabaseUserRepository(appDBPool.GetDB()),
+	dbPool, err := initDB(cfg, logger)
+
+	if err != nil {
+		logger.Fatal(err)
 	}
 
-	appDBPool.InitDatabase()
+	userRepo, err := user.NewDatabaseUserRepository(dbPool)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	tokenRepo, err := token.NewDatabaseTokenRepository(dbPool)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	app := Application{
+		config: cfg,
+		db:     dbPool,
+		logger: logger,
+
+		userRepo:  userRepo,
+		tokenRepo: tokenRepo,
+	}
 
 	return &app, nil
 }
 
-func initDBPool(cfg *configurations.Configuration) db.AppDBPool {
-	var dsn string
-
-	switch d := cfg.Database; d.Type {
+func initDB(cfg *configurations.Configuration, logger logrus.FieldLogger) (*gorm.DB, error) {
+	switch db.DbType(cfg.Database.Type) {
 	case db.Postgres:
-		pool := db.PostgresPool{}
-		dsn = fmt.Sprintf("postgres://%s:%s@%s:%d/%s", d.User, d.Password, d.Host, d.Port, d.Database)
+		logger.Println("Using PostgreSQL database...")
 
-		parameters := make([]string, 0)
-		if d.Ssl {
-			parameters = append(parameters, "sslmode=require")
-		}
+		return db.NewPostgresSession(cfg.Database)
+	default:
+		logger.Println("Unrecognized database type! Fallback to in-memory database!")
 
-		if len(parameters) > 0 {
-			dsn += "?" + strings.Join(parameters, "&")
-		}
-
-		sqlPool, err := sql.Open(string(d.Type), dsn)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		err = sqlPool.Ping()
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		pool.DB = sqlPool
-
-		return &pool
+		return db.NewInMemorySession()
 	}
-
-	return nil
 }
 
 func (a *Application) Config() *configurations.Configuration {
 	return a.config
 }
 
-func (a *Application) DBPool() *db.AppDBPool {
-	return a.dbPool
+func (a *Application) DB() *gorm.DB {
+	return a.db
+}
+
+func (a *Application) Logger() logrus.FieldLogger  {
+	return a.logger
 }
 
 func (a *Application) UserRepo() *user.DatabaseUserRepository {
 	return a.userRepo
+}
+
+func (a *Application) TokenRepo() *token.DatabaseTokenRepository {
+	return a.tokenRepo
 }

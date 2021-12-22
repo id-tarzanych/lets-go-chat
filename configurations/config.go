@@ -2,8 +2,6 @@ package configurations
 
 import (
 	"errors"
-	"github.com/id-tarzanych/lets-go-chat/db"
-
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
@@ -13,7 +11,7 @@ type Configuration struct {
 }
 
 type Database struct {
-	Type     db.DbType `yaml:"type" env:"LETS_GO_CHAT_DATABASE__TYPE"`
+	Type     string `yaml:"type" env:"LETS_GO_CHAT_DATABASE__TYPE"`
 	Host     string `yaml:"host" env:"LETS_GO_CHAT_DATABASE__HOST"`
 	Port     int    `yaml:"port" env:"LETS_GO_CHAT_DATABASE__PORT"`
 	Protocol string `yaml:"protocol" env:"LETS_GO_CHAT_DATABASE_PROTOCOL"`

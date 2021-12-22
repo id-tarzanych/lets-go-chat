@@ -1,0 +1,35 @@
+version: '3'
+
+networks:
+  integration-tests-network:
+    driver: bridge
+
+services:
+  integration-tests:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.test
+    environment:
+      LETS_GO_CHAT_DATABASE__TYPE: postgres
+      LETS_GO_CHAT_DATABASE__HOST: db
+      LETS_GO_CHAT_DATABASE__PORT: 5432
+      LETS_GO_CHAT_DATABASE__USER: root
+      LETS_GO_CHAT_DATABASE__PASSWORD: root
+      LETS_GO_CHAT_DATABASE__DATABASE: testdb
+    depends_on:
+      - db
+    networks:
+      - integration-tests-network
+  db:
+    image: postgres:11-alpine
+    ports:
+      - "5432:5432"
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: testdb
+    restart: on-failure
+    networks:
+      - integration-tests-network

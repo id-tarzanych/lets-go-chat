@@ -3,7 +3,10 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/id-tarzanych/lets-go-chat/db/token"
+	"github.com/sirupsen/logrus"
 	"net/http"
+	netUrl "net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -16,14 +19,17 @@ import (
 )
 
 type Users struct {
-	repo user.UserRepository
+	logger logrus.FieldLogger
+
+	userRepo  user.UserRepository
+	tokenRepo token.TokenRepository
 }
 
 const rateLimit = 100
 const tokenDuration = time.Hour
 
-func NewUsers(repo user.UserRepository) *Users {
-	return &Users{repo: repo}
+func NewUsers(logger logrus.FieldLogger, userRepo user.UserRepository, tokenRepo token.TokenRepository) *Users {
+	return &Users{logger: logger, userRepo: userRepo, tokenRepo: tokenRepo}
 }
 
 func (s Users) HandleUserCreate() http.HandlerFunc {
@@ -51,13 +57,13 @@ func (s Users) HandleUserCreate() http.HandlerFunc {
 			return
 		}
 
-		if _, err := s.repo.GetByUserName(nil, username); err == nil {
+		if _, err := s.userRepo.GetByUserName(nil, username); err == nil {
 			http.Error(w, fmt.Sprintf("User with username %s already exists", username), http.StatusBadRequest)
 			return
 		}
 
 		user := models.NewUser(username, password)
-		if err := s.repo.Create(nil, user); err != nil {
+		if err := s.userRepo.Create(nil, user); err != nil {
 			http.Error(w, fmt.Sprintf("Could not create user %s", username), http.StatusBadRequest)
 			return
 		}
@@ -65,15 +71,10 @@ func (s Users) HandleUserCreate() http.HandlerFunc {
 		respBody := struct {
 			Id       types.Uuid `json:"id"`
 			UserName string     `json:"userName"`
-		}{user.Id(), user.UserName()}
-
-		js, err := json.Marshal(respBody)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		}{user.ID, user.UserName}
 
 		w.Header().Set("Content-Type", "application/json")
+		js, _ := json.Marshal(respBody)
 		w.Write(js)
 	}
 }
@@ -99,30 +100,45 @@ func (s Users) HandleUserLogin() http.HandlerFunc {
 			return
 		}
 
-		user, err = s.repo.GetByUserName(nil, username)
+		user, err = s.userRepo.GetByUserName(nil, username)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("User %s does not exist", username), http.StatusBadRequest)
 			return
 		}
 
-		if !hasher.CheckPasswordHash(password, user.PasswordHash()) {
+		if !hasher.CheckPasswordHash(password, user.PasswordHash) {
 			http.Error(w, "Invalid username/password", http.StatusBadRequest)
 			return
 		}
 
-		respBody := struct {
-			Url string `json:"url"`
-		}{fmt.Sprintf("ws://fancy-chat.io/ws&token=%s", generators.RandomString(16))}
+		token := models.NewToken(
+			generators.RandomString(16),
+			user.ID,
+			time.Now().Add(tokenDuration),
+		)
 
-		js, err := json.Marshal(respBody)
+		err = s.tokenRepo.Create(nil, token)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, "Could not generate one-time token", http.StatusInternalServerError)
 			return
 		}
 
+		oneTimeUrl := netUrl.URL{
+			Scheme:   "ws",
+			Host:     r.Host,
+			Path:     "/chat/ws.rtm.start",
+			RawQuery: fmt.Sprintf("token=%s", token.Token),
+		}
+
+		respBody := struct {
+			Url string `json:"url"`
+		}{oneTimeUrl.String()}
+
+		js, _ := json.Marshal(respBody)
+
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Rate-Limit", strconv.Itoa(rateLimit))
-		w.Header().Set("X-Expires-After", time.Now().Add(tokenDuration).Format(time.RFC1123))
+		w.Header().Set("X-Expires-After", token.Expiration.Format(time.RFC1123))
 		w.Write(js)
 	}
 }
