@@ -1,9 +1,12 @@
 package models
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 
 	"github.com/google/uuid"
+
 	"github.com/id-tarzanych/lets-go-chat/internal/types"
 	"github.com/id-tarzanych/lets-go-chat/pkg/hasher"
 )
@@ -14,6 +17,7 @@ type User struct {
 	ID           types.Uuid `gorm:"primaryKey"`
 	UserName     string     `gorm:"column:username"`
 	PasswordHash string     `gorm:"column:password"`
+	LastActivity time.Time
 }
 
 func NewUser(username, password string) *User {

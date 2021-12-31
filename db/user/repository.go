@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+
 	"gorm.io/gorm"
 
 	"github.com/id-tarzanych/lets-go-chat/internal/types"
@@ -39,7 +40,7 @@ func (d DatabaseUserRepository) Create(ctx context.Context, u *models.User) erro
 }
 
 func (d DatabaseUserRepository) Update(ctx context.Context, u *models.User) error {
-	result := d.db.Model(&u).Updates(models.User{UserName: u.UserName, PasswordHash: u.PasswordHash})
+	result := d.db.Model(&u).Updates(models.User{UserName: u.UserName, PasswordHash: u.PasswordHash, LastActivity: u.LastActivity})
 	if result.Error != nil {
 		return result.Error
 	}

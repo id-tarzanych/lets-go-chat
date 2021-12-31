@@ -1,13 +1,13 @@
 package wss
 
 type ChatData struct {
-	Clients        map[*ClientObject]bool
-	ClientTokenMap map[string]*ClientObject
+	Clients        map[*Client]bool
+	ClientTokenMap map[string]*Client
 }
 
 func NewChatData() *ChatData {
 	return &ChatData{
-		Clients:        make(map[*ClientObject]bool),
-		ClientTokenMap: make(map[string]*ClientObject),
+		Clients:        make(map[*Client]bool),
+		ClientTokenMap: make(map[string]*Client),
 	}
 }
