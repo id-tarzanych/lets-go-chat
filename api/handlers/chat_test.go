@@ -184,7 +184,7 @@ func generateClientsData(count int) *wss.ChatData {
 		}
 
 		data.Clients[client] = true
-		data.ClientTokenMap[token] = client
+		data.ClientTokens[token] = client
 	}
 
 	return data

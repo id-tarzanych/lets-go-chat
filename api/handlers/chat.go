@@ -21,7 +21,6 @@ type Chat struct {
 
 	upgrader websocket.Upgrader
 	data     *wss.ChatData
-	// activityCh chan *models.User
 
 	userRepo    user.UserRepository
 	tokenRepo   token.TokenRepository
@@ -50,19 +49,7 @@ func NewChat(
 		userRepo:    userRepo,
 		tokenRepo:   tokenRepo,
 		messageRepo: messageRepo,
-
-		// activityCh: make(chan *models.User),
 	}
-
-	// go func() {
-	// 	for {
-	// 		updatedUser := <-chat.activityCh
-	//
-	// 		if err := userRepo.Update(nil, updatedUser); err != nil {
-	// 			logger.Println(err)
-	// 		}
-	// 	}
-	// }()
 
 	return chat
 }
@@ -81,12 +68,14 @@ func (c *Chat) HandleActiveUsers() http.HandlerFunc {
 }
 
 func (c *Chat) HandleChatSession() http.HandlerFunc {
-	ctx := context.TODO()
+	ctxChat := context.TODO()
 
 	taskCh := make(chan WorkerTask)
-	go broadcastWorker(ctx, taskCh, c.logger, c.userRepo)
+	go broadcastWorker(ctxChat, taskCh, c.logger, c.userRepo)
 
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.TODO()
+
 		c.upgrader.CheckOrigin = func(r *http.Request) bool {
 			return true
 		}
@@ -110,7 +99,7 @@ func (c *Chat) HandleChatSession() http.HandlerFunc {
 				c.logger.Println(err)
 			}
 
-			delete(c.data.Clients, preListen)
+			c.data.DeleteClient(preListen)
 		}()
 
 		for {
@@ -163,19 +152,19 @@ func (c *Chat) HandleChatSession() http.HandlerFunc {
 func (c *Chat) chuckClient(client *wss.Client) {
 	client.Stop()
 
-	delete(c.data.Clients, client)
-	delete(c.data.ClientTokenMap, client.EntryToken)
+	c.data.DeleteClient(client)
+	c.data.DeleteToken(client.EntryToken)
 }
 
 func (c *Chat) retrieveClient(ctx context.Context, token string, ws *websocket.Conn) (*wss.Client, error) {
 	c.logger.Println("Entry Token is : ", token)
 
-	if clientObj, found := c.data.ClientTokenMap[token]; found == true {
+	if clientObj := c.data.LoadClient(token); clientObj != nil {
 		// Update mapped client's web socket.
-		delete(c.data.Clients, clientObj)
+		c.data.DeleteClient(clientObj)
 
 		clientObj.WebSocket = ws
-		c.data.Clients[clientObj] = true
+		c.data.StoreClient(clientObj)
 
 		return clientObj, nil
 	}
@@ -222,10 +211,10 @@ func (c *Chat) retrieveClient(ctx context.Context, token string, ws *websocket.C
 	}
 
 	// Map entryToken to client object
-	c.data.ClientTokenMap[token] = clientObject
+	c.data.StoreToken(token, clientObject)
 
 	// Map clientObject to a boolean true for easy broadcast
-	c.data.Clients[clientObject] = true
+	c.data.StoreClient(clientObject)
 
 	return clientObject, nil
 }
