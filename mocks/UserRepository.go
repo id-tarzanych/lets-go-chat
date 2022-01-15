@@ -8,6 +8,8 @@ import (
 	models "github.com/id-tarzanych/lets-go-chat/models"
 	mock "github.com/stretchr/testify/mock"
 
+	time "time"
+
 	types "github.com/id-tarzanych/lets-go-chat/internal/types"
 )
 
@@ -116,6 +118,20 @@ func (_m *UserRepository) Update(ctx context.Context, u *models.User) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, *models.User) error); ok {
 		r0 = rf(ctx, u)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdateLastActivity provides a mock function with given fields: ctx, u, lastActivity
+func (_m *UserRepository) UpdateLastActivity(ctx context.Context, u *models.User, lastActivity time.Time) error {
+	ret := _m.Called(ctx, u, lastActivity)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *models.User, time.Time) error); ok {
+		r0 = rf(ctx, u, lastActivity)
 	} else {
 		r0 = ret.Error(0)
 	}

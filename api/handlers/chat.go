@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -15,14 +16,12 @@ import (
 	"github.com/id-tarzanych/lets-go-chat/models"
 )
 
-const WORKERS = 50
-
 type Chat struct {
 	logger logrus.FieldLogger
 
-	upgrader   websocket.Upgrader
-	data       *wss.ChatData
-	activityCh chan *models.User
+	upgrader websocket.Upgrader
+	data     *wss.ChatData
+	// activityCh chan *models.User
 
 	userRepo    user.UserRepository
 	tokenRepo   token.TokenRepository
@@ -52,15 +51,18 @@ func NewChat(
 		tokenRepo:   tokenRepo,
 		messageRepo: messageRepo,
 
-		activityCh: make(chan *models.User),
+		// activityCh: make(chan *models.User),
 	}
 
-	go func() {
-		for {
-			updatedUser := <-chat.activityCh
-			userRepo.Update(nil, updatedUser)
-		}
-	}()
+	// go func() {
+	// 	for {
+	// 		updatedUser := <-chat.activityCh
+	//
+	// 		if err := userRepo.Update(nil, updatedUser); err != nil {
+	// 			logger.Println(err)
+	// 		}
+	// 	}
+	// }()
 
 	return chat
 }
@@ -79,11 +81,10 @@ func (c *Chat) HandleActiveUsers() http.HandlerFunc {
 }
 
 func (c *Chat) HandleChatSession() http.HandlerFunc {
-	// Initialize bworkers pool
+	ctx := context.TODO()
+
 	taskCh := make(chan WorkerTask)
-	for i := 1; i <= WORKERS; i++ {
-		go broadcastWorker(taskCh, c.activityCh)
-	}
+	go broadcastWorker(ctx, taskCh, c.logger, c.userRepo)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		c.upgrader.CheckOrigin = func(r *http.Request) bool {
@@ -113,20 +114,22 @@ func (c *Chat) HandleChatSession() http.HandlerFunc {
 		}()
 
 		for {
-			retrievedClient, errHandle := c.retrieveClient(token, ws)
-			preListen = retrievedClient
+			retrievedClient, err := c.retrieveClient(ctx, token, ws)
 
-			if errHandle != nil {
+			if err != nil {
 				if retrievedClient != nil {
 					c.chuckClient(retrievedClient)
-				} else {
-					c.logger.Error("Could not initiate WebSocket connection.")
 
-					return
+					break
 				}
 
-				break
+				c.logger.Error("Could not initiate WebSocket connection.")
+
+				return
 			}
+
+			// Update pre-listen object with valid client.
+			preListen = retrievedClient
 
 			var newElement wss.ClientRequest
 
@@ -137,8 +140,7 @@ func (c *Chat) HandleChatSession() http.HandlerFunc {
 				break
 			}
 
-			err = json.Unmarshal(p, &newElement)
-			if err != nil {
+			if err = json.Unmarshal(p, &newElement); err != nil {
 				c.logger.Warningln("Invalid request. ", err, p)
 
 				break
@@ -147,8 +149,10 @@ func (c *Chat) HandleChatSession() http.HandlerFunc {
 			newElement.EntryToken = r.URL.Query().Get("token")
 			newElement.WebSocket = ws
 
-			m := &models.Message{Author: *retrievedClient.User, Message: newElement.Message}
-			c.messageRepo.Create(nil, m)
+			m := &models.Message{Author: *preListen.User, Message: newElement.Message}
+			if err := c.messageRepo.Create(ctx, m); err != nil {
+				return
+			}
 
 			// Broadcast message.
 			c.broadcastMessage(taskCh, m)
@@ -163,7 +167,7 @@ func (c *Chat) chuckClient(client *wss.Client) {
 	delete(c.data.ClientTokenMap, client.EntryToken)
 }
 
-func (c *Chat) retrieveClient(token string, ws *websocket.Conn) (*wss.Client, error) {
+func (c *Chat) retrieveClient(ctx context.Context, token string, ws *websocket.Conn) (*wss.Client, error) {
 	c.logger.Println("Entry Token is : ", token)
 
 	if clientObj, found := c.data.ClientTokenMap[token]; found == true {
@@ -176,12 +180,12 @@ func (c *Chat) retrieveClient(token string, ws *websocket.Conn) (*wss.Client, er
 		return clientObj, nil
 	}
 
-	t, err := c.tokenRepo.Get(nil, token)
+	t, err := c.tokenRepo.Get(ctx, token)
 	if err != nil {
 		return nil, err
 	}
 
-	u, err := c.userRepo.GetById(nil, t.UserId)
+	u, err := c.userRepo.GetById(ctx, t.UserId)
 	if err != nil {
 		return nil, err
 	}
@@ -189,16 +193,20 @@ func (c *Chat) retrieveClient(token string, ws *websocket.Conn) (*wss.Client, er
 	clientObject := wss.NewClientObject(time.Now(), &u, token, ws)
 
 	// Invalidate token.
-	if err = c.tokenRepo.Delete(nil, t.Token); err != nil {
+	if err = c.tokenRepo.Delete(ctx, t.Token); err != nil {
 		return nil, err
 	}
 
 	// Retrieve missed messages.
 	var missedMessages []models.Message
 	if clientObject.User.LastActivity.IsZero() {
-		missedMessages, _ = c.messageRepo.GetAll(nil)
+		missedMessages, err = c.messageRepo.GetAll(ctx)
 	} else {
-		missedMessages, _ = c.messageRepo.GetNewerThan(nil, clientObject.User.LastActivity)
+		missedMessages, err = c.messageRepo.GetNewerThan(ctx, clientObject.User.LastActivity)
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	var lastMessage models.Message
@@ -208,8 +216,9 @@ func (c *Chat) retrieveClient(token string, ws *websocket.Conn) (*wss.Client, er
 	}
 
 	if len(missedMessages) > 0 {
-		clientObject.User.LastActivity = lastMessage.CreatedAt
-		c.activityCh <- clientObject.User
+		if err := c.userRepo.UpdateLastActivity(ctx, clientObject.User, lastMessage.CreatedAt); err != nil {
+			return nil, err
+		}
 	}
 
 	// Map entryToken to client object
@@ -232,12 +241,20 @@ func (c *Chat) broadcastMessage(tasksCh chan WorkerTask, m *models.Message) {
 	}
 }
 
-func broadcastWorker(taskCh <-chan WorkerTask, activityCh chan *models.User) {
+func broadcastWorker(ctx context.Context, taskCh <-chan WorkerTask, logger logrus.FieldLogger, userRepo user.UserRepository) {
+	var err error
+
 	for {
 		task := <-taskCh
 
-		task.Client.SendMessage(task.Message)
-		task.Client.User.LastActivity = task.Message.CreatedAt
-		activityCh <- task.Client.User
+		if err = task.Client.SendMessage(task.Message); err != nil {
+			logger.Errorln(err)
+			break
+		}
+
+		if err = userRepo.UpdateLastActivity(ctx, task.Client.User, task.Message.CreatedAt); err != nil {
+			logger.Errorln(err)
+			break
+		}
 	}
 }

@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -16,6 +17,7 @@ type UserRepository interface {
 	GetById(ctx context.Context, id types.Uuid) (models.User, error)
 	GetByUserName(ctx context.Context, name string) (models.User, error)
 	GetAll(ctx context.Context) ([]models.User, error)
+	UpdateLastActivity(ctx context.Context, u *models.User, lastActivity time.Time) error
 }
 
 type DatabaseUserRepository struct {
@@ -78,7 +80,7 @@ func (d DatabaseUserRepository) GetByUserName(ctx context.Context, name string) 
 	return u, nil
 }
 
-func (d DatabaseUserRepository) GetAll(context.Context) ([]models.User, error) {
+func (d DatabaseUserRepository) GetAll(ctx context.Context) ([]models.User, error) {
 	var users []models.User
 
 	result := d.db.Find(&users)
@@ -87,4 +89,13 @@ func (d DatabaseUserRepository) GetAll(context.Context) ([]models.User, error) {
 	}
 
 	return users, nil
+}
+
+func (d DatabaseUserRepository) UpdateLastActivity(ctx context.Context, u *models.User, lastActivity time.Time) error {
+	u.LastActivity = lastActivity
+	if err := d.Update(ctx, u); err != nil {
+		return err
+	}
+
+	return nil
 }
