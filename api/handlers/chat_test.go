@@ -175,16 +175,16 @@ func generateClientsData(count int) *wss.ChatData {
 		username := generators.RandomString(8)
 		token := generators.RandomString(16)
 
-		client := &wss.ClientObject{
-			JoinedAt:        time.Now(),
-			UserName:        username,
-			EntryToken:      token,
-			IPAddress:       "1.1.1.1",
-			ClientWebSocket: nil,
+		client := &wss.Client{
+			JoinedAt:   time.Now(),
+			User:       models.NewUser(username, "password"),
+			EntryToken: token,
+			IPAddress:  "1.1.1.1",
+			WebSocket:  nil,
 		}
 
 		data.Clients[client] = true
-		data.ClientTokenMap[token] = client
+		data.ClientTokens[token] = client
 	}
 
 	return data

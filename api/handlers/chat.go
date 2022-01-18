@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -9,8 +10,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/id-tarzanych/lets-go-chat/api/wss"
+	"github.com/id-tarzanych/lets-go-chat/db/message"
 	"github.com/id-tarzanych/lets-go-chat/db/token"
 	"github.com/id-tarzanych/lets-go-chat/db/user"
+	"github.com/id-tarzanych/lets-go-chat/models"
 )
 
 type Chat struct {
@@ -19,20 +22,36 @@ type Chat struct {
 	upgrader websocket.Upgrader
 	data     *wss.ChatData
 
-	userRepo  user.UserRepository
-	tokenRepo token.TokenRepository
+	userRepo    user.UserRepository
+	tokenRepo   token.TokenRepository
+	messageRepo message.MessageRepository
 }
 
-func NewChat(logger logrus.FieldLogger, upgrader websocket.Upgrader, data *wss.ChatData, userRepo user.UserRepository, tokenRepo token.TokenRepository) *Chat {
-	return &Chat{
+type WorkerTask struct {
+	Client  *wss.Client
+	Message *models.Message
+}
+
+func NewChat(
+	logger logrus.FieldLogger,
+	upgrader websocket.Upgrader,
+	data *wss.ChatData,
+	userRepo user.UserRepository,
+	tokenRepo token.TokenRepository,
+	messageRepo message.MessageRepository,
+) *Chat {
+	chat := &Chat{
 		logger: logger,
 
 		upgrader: upgrader,
 		data:     data,
 
-		userRepo:  userRepo,
-		tokenRepo: tokenRepo,
+		userRepo:    userRepo,
+		tokenRepo:   tokenRepo,
+		messageRepo: messageRepo,
 	}
+
+	return chat
 }
 
 func (c *Chat) HandleActiveUsers() http.HandlerFunc {
@@ -49,7 +68,14 @@ func (c *Chat) HandleActiveUsers() http.HandlerFunc {
 }
 
 func (c *Chat) HandleChatSession() http.HandlerFunc {
+	ctxChat := context.TODO()
+
+	taskCh := make(chan WorkerTask)
+	go broadcastWorker(ctxChat, taskCh, c.logger, c.userRepo)
+
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.TODO()
+
 		c.upgrader.CheckOrigin = func(r *http.Request) bool {
 			return true
 		}
@@ -61,20 +87,39 @@ func (c *Chat) HandleChatSession() http.HandlerFunc {
 			return
 		}
 
-		var preListen *wss.ClientObject
+		token := r.URL.Query().Get("token")
+
+		var preListen *wss.Client
 		defer func() {
 			if preListen == nil {
 				return
 			}
 
-			if err := preListen.ClientWebSocket.Close(); err != nil {
+			if err := preListen.WebSocket.Close(); err != nil {
 				c.logger.Println(err)
 			}
 
-			delete(c.data.Clients, preListen)
+			c.data.DeleteClient(preListen)
 		}()
 
 		for {
+			retrievedClient, err := c.retrieveClient(ctx, token, ws)
+
+			if err != nil {
+				if retrievedClient != nil {
+					c.chuckClient(retrievedClient)
+
+					break
+				}
+
+				c.logger.Error("Could not initiate WebSocket connection.")
+
+				return
+			}
+
+			// Update pre-listen object with valid client.
+			preListen = retrievedClient
+
 			var newElement wss.ClientRequest
 
 			_, p, err := ws.ReadMessage()
@@ -84,8 +129,7 @@ func (c *Chat) HandleChatSession() http.HandlerFunc {
 				break
 			}
 
-			err = json.Unmarshal(p, &newElement)
-			if err != nil {
+			if err = json.Unmarshal(p, &newElement); err != nil {
 				c.logger.Warningln("Invalid request. ", err, p)
 
 				break
@@ -94,73 +138,112 @@ func (c *Chat) HandleChatSession() http.HandlerFunc {
 			newElement.EntryToken = r.URL.Query().Get("token")
 			newElement.WebSocket = ws
 
-			retrievedClient, errHandle := c.handleClientMessage(newElement)
-			preListen = retrievedClient
-
-			if errHandle != nil {
-				if retrievedClient != nil {
-					c.chuckClient(retrievedClient)
-				} else {
-					c.logger.Error("Could not initiate WebSocket connection.")
-
-					return
-				}
-
-				break
+			m := &models.Message{Author: *preListen.User, Message: newElement.Message}
+			if err := c.messageRepo.Create(ctx, m); err != nil {
+				return
 			}
 
-			// Pong original message.
-			preListen.ClientWebSocket.WriteJSON(newElement)
+			// Broadcast message.
+			c.broadcastMessage(taskCh, m)
 		}
 	}
 }
 
-func (c *Chat) chuckClient(object *wss.ClientObject) {
-	delete(c.data.Clients, object)
-	delete(c.data.ClientTokenMap, object.EntryToken)
+func (c *Chat) chuckClient(client *wss.Client) {
+	client.Stop()
+
+	c.data.DeleteClient(client)
+	c.data.DeleteToken(client.EntryToken)
 }
 
-func (c *Chat) handleClientMessage(clientData wss.ClientRequest) (*wss.ClientObject, error) {
-	c.logger.Println("Entry Token is : ", clientData.EntryToken)
+func (c *Chat) retrieveClient(ctx context.Context, token string, ws *websocket.Conn) (*wss.Client, error) {
+	c.logger.Println("Entry Token is : ", token)
 
-	if clientObj, found := c.data.ClientTokenMap[clientData.EntryToken]; found == true {
+	if clientObj := c.data.LoadClient(token); clientObj != nil {
 		// Update mapped client's web socket.
-		delete(c.data.Clients, clientObj)
+		c.data.DeleteClient(clientObj)
 
-		clientObj.ClientWebSocket = clientData.WebSocket
-		c.data.Clients[clientObj] = true
+		clientObj.WebSocket = ws
+		c.data.StoreClient(clientObj)
 
 		return clientObj, nil
 	}
 
-	t, err := c.tokenRepo.Get(nil, clientData.EntryToken)
+	t, err := c.tokenRepo.Get(ctx, token)
 	if err != nil {
 		return nil, err
 	}
 
-	u, err := c.userRepo.GetById(nil, t.UserId)
+	u, err := c.userRepo.GetById(ctx, t.UserId)
 	if err != nil {
 		return nil, err
 	}
 
-	clientObject := &wss.ClientObject{
-		UserName:        u.UserName,
-		ClientWebSocket: clientData.WebSocket,
-		IPAddress:       clientData.WebSocket.RemoteAddr().String(),
-		EntryToken:      clientData.EntryToken,
-		JoinedAt:        time.Now(),
-	}
+	clientObject := wss.NewClientObject(time.Now(), &u, token, ws)
 
 	// Invalidate token.
-	if err = c.tokenRepo.Delete(nil, t.Token); err != nil {
+	if err = c.tokenRepo.Delete(ctx, t.Token); err != nil {
 		return nil, err
+	}
+
+	// Retrieve missed messages.
+	var missedMessages []models.Message
+	if clientObject.User.LastActivity.IsZero() {
+		missedMessages, err = c.messageRepo.GetAll(ctx)
+	} else {
+		missedMessages, err = c.messageRepo.GetNewerThan(ctx, clientObject.User.LastActivity)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	var lastMessage models.Message
+	for i := range missedMessages {
+		lastMessage = missedMessages[i]
+		clientObject.SendMessage(&lastMessage)
+	}
+
+	if len(missedMessages) > 0 {
+		if err := c.userRepo.UpdateLastActivity(ctx, clientObject.User, lastMessage.CreatedAt); err != nil {
+			return nil, err
+		}
 	}
 
 	// Map entryToken to client object
-	c.data.ClientTokenMap[clientData.EntryToken] = clientObject
+	c.data.StoreToken(token, clientObject)
 
 	// Map clientObject to a boolean true for easy broadcast
-	c.data.Clients[clientObject] = true
+	c.data.StoreClient(clientObject)
 
 	return clientObject, nil
+}
+
+func (c *Chat) broadcastMessage(tasksCh chan WorkerTask, m *models.Message) {
+	for client := range c.data.Clients {
+		go func(c *wss.Client) {
+			tasksCh <- WorkerTask{
+				Client:  c,
+				Message: m,
+			}
+		}(client)
+	}
+}
+
+func broadcastWorker(ctx context.Context, taskCh <-chan WorkerTask, logger logrus.FieldLogger, userRepo user.UserRepository) {
+	var err error
+
+	for {
+		task := <-taskCh
+
+		if err = task.Client.SendMessage(task.Message); err != nil {
+			logger.Errorln(err)
+			break
+		}
+
+		if err = userRepo.UpdateLastActivity(ctx, task.Client.User, task.Message.CreatedAt); err != nil {
+			logger.Errorln(err)
+			break
+		}
+	}
 }
