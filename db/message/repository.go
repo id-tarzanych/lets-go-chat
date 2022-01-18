@@ -31,7 +31,8 @@ func NewDatabaseMessageRepository(db *gorm.DB) (*DatabaseMessageRepository, erro
 }
 
 func (d DatabaseMessageRepository) Create(ctx context.Context, u *models.Message) error {
-	if result := d.db.Create(&u); result.Error != nil {
+	timeoutContext, _ := context.WithTimeout(ctx, time.Second*5)
+	if result := d.db.WithContext(timeoutContext).Create(&u); result.Error != nil {
 		return result.Error
 	}
 
@@ -57,8 +58,9 @@ func (d DatabaseMessageRepository) Delete(ctx context.Context, id uint) error {
 
 func (d DatabaseMessageRepository) GetAll(ctx context.Context) ([]models.Message, error) {
 	var messages []models.Message
+	timeoutContext, _ := context.WithTimeout(ctx, time.Second*5)
 
-	result := d.db.Order("created_at").Preload("Author").Find(&messages)
+	result := d.db.WithContext(timeoutContext).Order("created_at").Preload("Author").Find(&messages)
 	if result.Error != nil {
 		return messages, result.Error
 	}
@@ -66,10 +68,11 @@ func (d DatabaseMessageRepository) GetAll(ctx context.Context) ([]models.Message
 	return messages, nil
 }
 
-func (d DatabaseMessageRepository) GetNewerThan(ctx context.Context, time time.Time) ([]models.Message, error) {
+func (d DatabaseMessageRepository) GetNewerThan(ctx context.Context, begin time.Time) ([]models.Message, error) {
+	timeoutContext, _ := context.WithTimeout(ctx, time.Second*5)
 	var messages []models.Message
 
-	result := d.db.Where("created_at > ?", time).Preload("Author").Order("created_at").Find(&messages)
+	result := d.db.WithContext(timeoutContext).Where("created_at > ?", begin).Preload("Author").Order("created_at").Find(&messages)
 	if result.Error != nil {
 		return messages, result.Error
 	}

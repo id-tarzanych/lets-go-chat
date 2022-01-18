@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	_ "net/http/pprof"
+	"runtime/trace"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -26,8 +28,8 @@ func (s Server) WsRTMStart(w http.ResponseWriter, r *http.Request, params WsRTMS
 		return true
 	}
 
-	ws, err := s.requestUpgrader.Upgrade(w, r, nil)
-	if err != nil {
+	ws, errConn := s.requestUpgrader.Upgrade(w, r, nil)
+	if errConn != nil {
 		s.logger.Error("Could not initiate WebSocket connection.")
 
 		return
@@ -67,17 +69,19 @@ func (s Server) WsRTMStart(w http.ResponseWriter, r *http.Request, params WsRTMS
 		var newElement wss.ClientRequest
 
 		_, p, err := ws.ReadMessage()
-		if err != nil {
+		if errConn != nil {
 			s.logger.Println("Client Disconnected: ", err, preListen.EntryToken)
 
 			break
 		}
 
-		if err = json.Unmarshal(p, &newElement); err != nil {
+		if err := json.Unmarshal(p, &newElement); err != nil {
 			s.logger.Warningln("Invalid request. ", err, p)
 
 			break
 		}
+
+		ctx, task := trace.NewTask(ctx, "sendMessage")
 
 		newElement.EntryToken = token
 		newElement.WebSocket = ws
@@ -86,9 +90,11 @@ func (s Server) WsRTMStart(w http.ResponseWriter, r *http.Request, params WsRTMS
 		if err := s.messageRepo.Create(ctx, m); err != nil {
 			return
 		}
+		task.End()
 
 		// Broadcast message.
 		s.broadcastMessage(s.taskCh, ctx, m)
+
 	}
 }
 
