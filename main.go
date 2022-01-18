@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/id-tarzanych/lets-go-chat/api/server"
 	"github.com/id-tarzanych/lets-go-chat/app"
@@ -17,15 +19,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	application, err := app.New(config)
+	application, err := app.InitializeApp(config)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	runServer(application)
+	runServer(&application)
 }
 
 func runServer(app *app.Application) {
-	srv := server.New(*app.Config(), app.UserRepo(), app.TokenRepo(), app.MessageRepo(), app.Logger())
-	srv.Handle()
+	s := server.New(*app.Config(), app.UserRepo(), app.TokenRepo(), app.MessageRepo(), app.Logger())
+	h := server.Handler(s)
+
+	err := http.ListenAndServe(":"+strconv.Itoa(s.Port()), h)
+	if err != nil {
+		app.Logger().Fatal("Could not start server")
+	}
 }
