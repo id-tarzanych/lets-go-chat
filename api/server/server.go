@@ -1,87 +1,88 @@
 package server
 
 import (
-    "fmt"
-    "net/http"
+	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
+	"github.com/sirupsen/logrus"
 
-    "github.com/gorilla/mux"
-    "github.com/gorilla/websocket"
-    "github.com/justinas/alice"
-    "github.com/sirupsen/logrus"
-
-    "github.com/id-tarzanych/lets-go-chat/api/handlers"
-    "github.com/id-tarzanych/lets-go-chat/api/middlewares"
-    "github.com/id-tarzanych/lets-go-chat/api/wss"
-    "github.com/id-tarzanych/lets-go-chat/configurations"
-    "github.com/id-tarzanych/lets-go-chat/db/message"
-    "github.com/id-tarzanych/lets-go-chat/db/token"
-    "github.com/id-tarzanych/lets-go-chat/db/user"
+	"github.com/id-tarzanych/lets-go-chat/api/middlewares"
+	"github.com/id-tarzanych/lets-go-chat/api/wss"
+	"github.com/id-tarzanych/lets-go-chat/configurations"
+	"github.com/id-tarzanych/lets-go-chat/db/message"
+	"github.com/id-tarzanych/lets-go-chat/db/token"
+	"github.com/id-tarzanych/lets-go-chat/db/user"
 )
 
 type Server struct {
-    port int
+	port int
 
-    logger logrus.FieldLogger
+	logger logrus.FieldLogger
 
-    logMiddleware  *middlewares.LogMiddleware
-    authMiddleware *middlewares.AuthMiddleware
-    router         *mux.Router
+	logMiddleware  *middlewares.LogMiddleware
+	authMiddleware *middlewares.AuthMiddleware
+	router         *mux.Router
 
-    chatData *wss.ChatData
+	chatData *wss.ChatData
+	taskCh   chan WorkerTask
 
-    requestUpgrader websocket.Upgrader
+	requestUpgrader websocket.Upgrader
 
-    userRepo    user.UserRepository
-    tokenRepo   token.TokenRepository
-    messageRepo message.MessageRepository
+	userRepo    user.UserRepository
+	tokenRepo   token.TokenRepository
+	messageRepo message.MessageRepository
 }
 
 func New(
-    cfg configurations.Configuration,
-    userRepo user.UserRepository,
-    tokenRepo token.TokenRepository,
-    messageRepo message.MessageRepository,
-    logger logrus.FieldLogger,
+	cfg configurations.Configuration,
+	userRepo user.UserRepository,
+	tokenRepo token.TokenRepository,
+	messageRepo message.MessageRepository,
+	logger logrus.FieldLogger,
 ) *Server {
-    s := &Server{
-        port: cfg.Server.Port,
+	s := &Server{
+		port: cfg.Server.Port,
 
-        logger: logger,
+		logger: logger,
 
-        logMiddleware:  middlewares.NewLogMiddleware(logger),
-        authMiddleware: middlewares.NewAuthMiddleware(tokenRepo),
-        router:         mux.NewRouter(),
+		logMiddleware:  middlewares.NewLogMiddleware(logger),
+		authMiddleware: middlewares.NewAuthMiddleware(tokenRepo),
 
-        chatData: wss.NewChatData(),
+		chatData: wss.NewChatData(),
+		taskCh:   make(chan WorkerTask),
 
-        requestUpgrader: websocket.Upgrader{
-            ReadBufferSize:  1024,
-            WriteBufferSize: 1024,
-        },
+		requestUpgrader: websocket.Upgrader{
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+		},
 
-        userRepo:    userRepo,
-        tokenRepo:   tokenRepo,
-        messageRepo: messageRepo,
-    }
+		userRepo:    userRepo,
+		tokenRepo:   tokenRepo,
+		messageRepo: messageRepo,
+	}
 
-    s.routes()
+	go broadcastWorker(s.taskCh, s.logger, s.userRepo)
 
-    return s
+	return s
 }
 
-func (s *Server) Handle() {
-    s.logger.Error(http.ListenAndServe(fmt.Sprintf(":%d", s.port), s.router))
+func (s Server) Port() int {
+	return s.port
 }
 
-func (s *Server) routes() {
-    userHandlers := handlers.NewUsers(s.logger, s.userRepo, s.tokenRepo)
-    chatHandlers := handlers.NewChat(s.logger, s.requestUpgrader, s.chatData, s.userRepo, s.tokenRepo, s.messageRepo)
+func broadcastWorker(taskCh <-chan WorkerTask, logger logrus.FieldLogger, userRepo user.UserRepository) {
+	var err error
 
-    commonMW := alice.New(s.logMiddleware.LogError, s.logMiddleware.LogRequest, s.logMiddleware.LogPanicRecovery)
+	for {
+		task := <-taskCh
 
-    s.router.Handle("/user", commonMW.Append(middlewares.PostOnly).ThenFunc(userHandlers.HandleUserCreate()))
-    s.router.Handle("/user/login", commonMW.Append(middlewares.PostOnly).ThenFunc(userHandlers.HandleUserLogin()))
+		if err = task.Client.SendMessage(task.Message); err != nil {
+			logger.Errorln(err)
+			break
+		}
 
-    s.router.Handle("/user/active", commonMW.Append(middlewares.GetOnly).ThenFunc(chatHandlers.HandleActiveUsers()))
-    s.router.Handle("/chat/ws.rtm.start", commonMW.Append(s.authMiddleware.ValidateToken).Then(chatHandlers.HandleChatSession()))
+		if err = userRepo.UpdateLastActivity(task.Context, task.Client.User, task.Message.CreatedAt); err != nil {
+			logger.Errorln(err)
+			break
+		}
+	}
 }

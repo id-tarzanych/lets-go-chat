@@ -71,7 +71,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LoginUserResonse'
+                $ref: '#/components/schemas/LoginUserResponse'
         400:
           description: Invalid username/password
           content: {}
@@ -132,7 +132,7 @@ components:
         password:
           type: string
           description: The password for login in clear text
-    LoginUserResonse:
+    LoginUserResponse:
       required:
       - url
       type: object
