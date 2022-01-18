@@ -1,6 +1,9 @@
 package server
 
 import (
+	_ "net/http/pprof"
+	"runtime/trace"
+
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
@@ -70,17 +73,17 @@ func (s Server) Port() int {
 }
 
 func broadcastWorker(taskCh <-chan WorkerTask, logger logrus.FieldLogger, userRepo user.UserRepository) {
-	var err error
-
 	for {
 		task := <-taskCh
 
-		if err = task.Client.SendMessage(task.Message); err != nil {
+		trace.Log(task.Context, "messageSend", task.Message.Message)
+		if err := task.Client.SendMessage(task.Message); err != nil {
 			logger.Errorln(err)
 			break
 		}
 
-		if err = userRepo.UpdateLastActivity(task.Context, task.Client.User, task.Message.CreatedAt); err != nil {
+		trace.Log(task.Context, "updateLatestActivity", task.Client.User.UserName)
+		if err := userRepo.UpdateLastActivity(task.Context, task.Client.User, task.Message.CreatedAt); err != nil {
 			logger.Errorln(err)
 			break
 		}
